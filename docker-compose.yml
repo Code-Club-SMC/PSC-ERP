@@ -1,0 +1,28 @@
+services:
+  backend:
+    build:
+      context: ./psc-backend
+    container_name: psc-backend-app
+    restart: always
+    ports:
+      - "3000:3000"
+    volumes:
+      - notification_data:/app/data
+      - bills_data:/app/data/bills
+      - ./psc-backend/data/bills:/app/data/bills
+    env_file:
+      - .env
+
+  admin-portal:
+    build:
+      context: ./admin-portal
+    container_name: psc-admin-portal
+    restart: always
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  notification_data:
+  bills_data:

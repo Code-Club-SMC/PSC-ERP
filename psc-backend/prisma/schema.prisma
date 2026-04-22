@@ -1,0 +1,1359 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// admin role
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+}
+
+model Admin {
+  id               Int               @id @default(autoincrement())
+  name             String
+  email            String            @unique
+  password         String
+  biometricsKey    String? // public key
+  role             Role              @default(ADMIN)
+  permissions      Json?
+  roomReservations RoomReservation[]
+  hallReservations HallReservation[]
+  lawnReservations LawnReservation[]
+  photoshootReservations PhotoshootReservation[]
+
+  createdBy String @default("")
+  updatedBy String @default("")
+
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@map("admin")
+}
+
+enum MemberStatus {
+  REGULAR
+  ABSENT
+  CANCELLED
+  CLEAR
+  DEFAULTER
+  DIED
+  HONORARY
+  SUSPENDED
+  TERMINATED
+}
+
+model Member {
+  Sno           Int          @id @default(autoincrement())
+  Membership_No String       @unique
+  Name          String
+  Email         String?      @unique
+  Contact_No    String?      @unique
+  Actual_Status MemberStatus @default(CLEAR)
+  Status        String       @default("active")
+  Balance       Decimal?     @default(0.00) @db.Decimal(20, 2)
+  Other_Details String?
+  
+  memberType String @default("CIVILIAN")
+
+  FCMToken String?
+  sessionToken String? // UUID generated at login, used for single-device session enforcement
+
+  roomBookings        RoomBooking[]
+  hallBookings        HallBooking[]
+  lawnBookings        LawnBooking[]
+  photoshootBookings  PhotoshootBooking[]
+
+  sportsSubscriptions SportSubscription[]
+
+  RoomHolding         roomHoldings[]
+  hallHolding         hallHoldings[]
+  lawnHolding         lawnHoldings[]
+
+  notifications deliveredNotis[]
+
+  totalBookings   Int       @default(0)
+  drAmount        Decimal   @default(0.00) @db.Decimal(12, 2)
+  crAmount        Decimal   @default(0.00) @db.Decimal(12, 2)
+
+  bookingAmountPaid Int @default(0)
+  bookingAmountDue  Int @default(0)
+  bookingBalance   Int @default(0)
+
+  lastBookingDate DateTime?
+
+  // vouchers PaymentVoucher[]
+  feedbacks Feedback[]
+  billPayments BillPaymentHistory[]
+
+  otp       Int? //temp otp
+  otpExpiry DateTime? //otp expiry time
+
+  createdBy String @default("")
+  updatedBy String @default("")
+
+  createdAt DateTime  @default(now())
+  updatedat DateTime  @updatedAt
+
+  @@map("member")
+}
+
+enum PaymentStatus {
+  UNPAID
+  HALF_PAID
+  PAID
+  TO_BILL
+  ADVANCE_PAYMENT
+}
+
+enum PaidBy {
+  MEMBER
+  GUEST
+  FORCES
+}
+
+model RoomBooking {
+  id            Int      @id @default(autoincrement())
+  Membership_No String
+  roomId        Int?     // Keeping as optional for backward compatibility if needed, but primary relation is now 'rooms'
+  rooms         RoomOnBooking[]
+  checkIn       DateTime
+  checkOut      DateTime
+
+  totalPrice    Decimal       @default(0.00) @db.Decimal(30, 2)
+  paymentStatus PaymentStatus @default(UNPAID)
+  pricingType   String
+  paidAmount    Decimal       @default(0.00) @db.Decimal(30, 2)
+  pendingAmount Decimal       @default(0.00) @db.Decimal(30, 2)
+
+  numberOfAdults   Int @default(1)
+  numberOfChildren Int @default(0)
+
+  guestName    String? @db.Text
+  guestContact String? @db.Text
+  guestCNIC    String? @db.Text
+  paidBy       PaidBy  @default(MEMBER)
+
+  specialRequests String? @db.Text
+  remarks         String? @db.Text
+
+  refundAmount   Decimal @default(0.00) @db.Decimal(30, 2)
+  refundReturned Boolean @default(false)
+  isConfirmed    Boolean @default(false)
+  isCancelled    Boolean @default(false)
+  isClosed       Boolean @default(false)
+  extraCharges   Json?   @default("[]") // Stores { head: string, amount: number }
+  cancellationRequests RoomCancellationRequest[]
+
+  local_sync         Int       @default(0)
+  local_sync_id       String?
+  local_sync_status   Int?
+  sync_datetime      DateTime?
+  local_sync_message String?   @db.Text
+
+  member Member @relation(fields: [Membership_No], references: [Membership_No])
+  // room   Room   @relation(fields: [roomId], references: [id]) // Removed direct single relation mapping validation, logic handled in service
+
+
+  createdBy String?
+  updatedBy String? 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("roombooking")
+}
+
+enum BookingOpt {
+  MORNING
+  EVENING
+  NIGHT
+  DAY
+}
+
+model HallBooking {
+  id             Int           @id @default(autoincrement())
+  memberId       Int
+  hallId         Int
+  bookingDate    DateTime
+  totalPrice     Decimal       @default(0.00) @db.Decimal(30, 2)
+  paymentStatus  PaymentStatus @default(UNPAID)
+  pricingType    String
+  paidAmount     Decimal       @default(0.00) @db.Decimal(30, 2)
+  pendingAmount  Decimal       @default(0.00) @db.Decimal(30, 2)
+  eventType      String        @db.VarChar(255)
+  numberOfGuests Int           @default(0)
+  numberOfDays   Int           @default(1)
+  endDate        DateTime      @default(now())
+  bookingDetails Json          @default("[]") // For storing detailed date-wise slots: [{ date: "2024-01-01", timeSlot: "MORNING" }]
+
+  bookingTime BookingOpt @default(NIGHT)
+
+  guestName    String? @db.Text
+  guestContact String? @db.Text
+  guestCNIC    String? @db.Text
+  paidBy       PaidBy  @default(MEMBER)
+  remarks      String? @db.Text
+
+
+  refundAmount   Decimal @default(0.00) @db.Decimal(30, 2)
+  refundReturned Boolean @default(false)
+  isConfirmed    Boolean @default(false)
+  isCancelled    Boolean @default(false)
+  isClosed       Boolean @default(false)
+  extraCharges   Json?   @default("[]") // Stores { head: string, amount: number }
+  cancellationRequests HallCancellationRequest[]
+
+  member Member @relation(fields: [memberId], references: [Sno])
+  hall   Hall   @relation(fields: [hallId], references: [id])
+
+  createdBy String?
+  updatedBy String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("hallbooking")
+}
+
+model LawnBooking {
+  id            Int           @id @default(autoincrement())
+  memberId      Int
+  lawnId        Int
+  bookingDate   DateTime
+  eventType     String?       @db.VarChar(255)
+  bookingTime   BookingOpt    @default(NIGHT)
+  guestsCount   Int
+  totalPrice    Decimal       @default(0.00) @db.Decimal(30, 2)
+  paymentStatus PaymentStatus @default(UNPAID)
+  pricingType   String
+  paidAmount    Decimal       @default(0.00) @db.Decimal(30, 2)
+  pendingAmount Decimal       @default(0.00) @db.Decimal(30, 2)
+  numberOfDays   Int           @default(1)
+  endDate        DateTime      @default(now())
+  bookingDetails Json          @default("[]") // For storing detailed date-wise slots: [{ date: "2024-01-01", timeSlot: "MORNING", eventType: "wedding" }]
+
+
+  guestName    String? @db.Text
+  guestContact String? @db.Text
+  guestCNIC    String? @db.Text
+  paidBy       PaidBy  @default(MEMBER)
+  remarks      String? @db.Text
+
+
+  refundAmount   Decimal @default(0.00) @db.Decimal(30, 2)
+  refundReturned Boolean @default(false)
+  isConfirmed    Boolean @default(false)
+  isCancelled    Boolean @default(false)
+  isClosed       Boolean @default(false)
+  extraCharges   Json?   @default("[]") // Stores { head: string, amount: number }
+  cancellationRequests LawnCancellationRequest[]
+
+  member Member @relation(fields: [memberId], references: [Sno])
+  lawn   Lawn   @relation(fields: [lawnId], references: [id])
+
+  createdBy String?
+  updatedBy String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("lawnbooking")
+}
+
+model PhotoshootBooking {
+  id            Int           @id @default(autoincrement())
+  memberId      Int
+  photoshootId  Int
+  bookingDate   DateTime
+  startTime     DateTime
+  endTime       DateTime
+  totalPrice    Decimal       @default(0.00) @db.Decimal(30, 2)
+  paymentStatus PaymentStatus @default(UNPAID)
+  pricingType   String
+  paidAmount    Decimal       @default(0.00) @db.Decimal(30, 2)
+  pendingAmount Decimal       @default(0.00) @db.Decimal(30, 2)
+
+
+  guestName    String? @db.Text
+  guestContact String? @db.Text
+  guestCNIC    String? @db.Text
+  paidBy       PaidBy  @default(MEMBER)
+  remarks      String? @db.Text
+
+  refundAmount   Decimal @default(0.00) @db.Decimal(30, 2)
+  refundReturned Boolean @default(false)
+  bookingDetails Json?   @default("[]") // Array of { date: string, timeSlot: string }
+  isConfirmed    Boolean @default(false)
+  isCancelled    Boolean @default(false)
+  cancellationRequests PhotoshootCancellationRequest[]
+
+
+  member     Member     @relation(fields: [memberId], references: [Sno])
+  photoshoot Photoshoot @relation(fields: [photoshootId], references: [id])
+
+  createdBy String?
+  updatedBy String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("photoshootbooking")
+}
+
+model SportSubscription {
+  id         Int        @id @default(autoincrement())
+  memberId   Int
+  sportId    Int
+  chargeType ChargeType
+  startDate  DateTime
+  endDate    DateTime?
+  totalPaid  Decimal    @default(0.00) @db.Decimal(30, 2)
+  isActive   Boolean    @default(true)
+
+  member Member @relation(fields: [memberId], references: [Sno])
+  sport  Sport  @relation(fields: [sportId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("sportsubscription")
+}
+
+model PaymentVoucher {
+  id              Int    @id @default(autoincrement())
+  consumer_number String @unique
+  voucher_no      String? @unique
+
+  booking_type BookingType?
+  booking_id   Int?
+
+  membership_no String
+  // member        Member @relation(fields: [membership_no], references: [Membership_No], onDelete: Cascade)
+
+  amount Decimal @db.Decimal(12, 2)
+
+  // Payment origin & mode
+  payment_mode PaymentMode @default(CASH)
+  channel      Channel?
+
+  // Gateway details (only for ONLINE)
+  invoice_no     String? // KuickPay InvoiceNumber
+  transaction_id String? // KuickPay TransactionId
+  consumer_id    String? // KuickPay ConsumerId
+  gateway_meta   Json? // Full webhook data from KuickPay
+
+  // New fields for identifying transaction medium
+  card_number     String?
+  check_number    String?
+  bank_name       String?
+
+  remarks String? @db.Text
+
+  voucher_type VoucherType
+  status       VoucherStatus @default(PENDING)
+  expiresAt    DateTime?     // For temporary vouchers (e.g. 1 hour)
+
+  issued_at DateTime @default(now())
+  issued_by String? // admin name OR "system"
+  paid_at   DateTime?
+
+  @@index([booking_type, booking_id])
+  @@index([membership_no])
+  @@index([consumer_number])
+  @@index([voucher_no])
+
+  @@map("paymentvoucher")
+}
+
+enum Channel {
+  ADMIN_PORTAL
+  KUICKPAY
+}
+
+enum BookingType {
+  ROOM
+  HALL
+  LAWN
+  PHOTOSHOOT
+  AFF_ROOM
+}
+
+enum PaymentMode {
+  CASH
+  ONLINE
+  CARD
+  CHECK
+  KUICKPAY
+}
+
+enum VoucherType {
+  FULL_PAYMENT
+  HALF_PAYMENT
+  REFUND
+  ADJUSTMENT
+  ADVANCE_PAYMENT
+  TO_BILL
+}
+
+enum VoucherStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  EXPIRED
+}
+
+// rooms types
+model RoomType {
+  id          Int     @id @unique() @default(autoincrement())
+  type        String  @db.VarChar(50)
+  priceMember Decimal @default(0.00) @db.Decimal(30, 2)
+  priceGuest  Decimal @default(0.00) @db.Decimal(30, 2)
+  priceForces Decimal? @default(0.00) @db.Decimal(30, 2)
+
+  images Json @default("[]")
+
+  rooms     Room[]
+
+  createdBy String @default("")
+  updatedBy String @default("")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("roomtype")
+}
+
+model RoomReservation {
+  id           Int      @id @default(autoincrement())
+  roomId       Int
+  room         Room     @relation(fields: [roomId], references: [id])
+  reservedFrom DateTime
+  reservedTo   DateTime
+  reservedBy   Int
+  admin        Admin    @relation(fields: [reservedBy], references: [id])
+  remarks      String?  @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([roomId])
+  @@index([reservedFrom, reservedTo])
+
+  @@map("roomreservation")
+}
+
+// rooms
+model Room {
+  id         Int      @id @unique @default(autoincrement())
+  roomNumber String   @unique() @db.VarChar(50)
+  roomTypeId Int
+  roomType   RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
+
+  description  String?           @db.VarChar(300)
+  isActive     Boolean           @default(true)
+  outOfOrders  RoomOutOfOrder[]
+  isReserved   Boolean           @default(false)
+  isBooked     Boolean           @default(false)
+  bookings     RoomOnBooking[]
+  reservations RoomReservation[]
+  holdings roomHoldings[]
+  affBookings AffClubBookingRoom[]
+
+  createdBy String @default("")
+  updatedBy String @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("room")
+}
+
+model RoomOnBooking {
+  id        Int      @id @default(autoincrement())
+  bookingId Int
+  booking   RoomBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  roomId    Int
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  // Store price at the time of booking to protect against future price changes
+  priceAtBooking Decimal @db.Decimal(30, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([bookingId])
+  @@index([roomId])
+
+  @@map("roomonbooking")
+}
+
+model roomHoldings {
+  id Int @id @unique @default(autoincrement())
+  onHold       Boolean           @default(false)
+  holdExpiry   DateTime?
+  checkIn      DateTime? // Added for exact date holding
+  checkOut     DateTime? // Added for exact date holding
+  holdBy       String?
+  holdMember   Member?           @relation(fields: [holdBy], references: [Membership_No])
+  roomId Int
+  room Room @relation(fields: [roomId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("roomholdings")
+}
+
+model RoomOutOfOrder {
+  id     Int  @id @unique @default(autoincrement())
+  roomId Int
+  room   Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  reason    String   @db.VarChar(300)
+  startDate DateTime
+  endDate   DateTime
+
+  createdBy String @default("")
+  updatedBy String @default("")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([roomId])
+  @@index([startDate])
+  @@index([endDate])
+
+  @@map("roomoutoforder")
+}
+
+// halls
+model Hall {
+  id          Int     @id @unique() @default(autoincrement())
+  name        String  @db.VarChar(50)
+  description String? @db.Text
+
+  capacity       Int
+  chargesMembers Decimal @default(0.00) @db.Decimal(30, 2)
+  chargesGuests  Decimal @default(0.00) @db.Decimal(30, 2)
+  chargesCorporate Decimal @default(0.00) @db.Decimal(30, 2)
+  order            Int     @default(0)
+
+  isActive    Boolean          @default(true)
+  isExclusive Boolean          @default(false)
+  isOutOfService Boolean      @default(false)
+  outOfOrders HallOutOfOrder[]
+
+  images Json @default("[]")
+
+  holdings hallHoldings[]
+
+  isBooked Boolean       @default(false)
+  bookings HallBooking[]
+
+  isReserved   Boolean           @default(false)
+  reservations HallReservation[]
+
+  createdBy String @default("")
+  updatedBy String @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("hall")
+}
+
+model hallHoldings {
+  id Int @id @unique @default(autoincrement())
+  onHold       Boolean           @default(false)
+  holdExpiry   DateTime?
+  fromDate     DateTime? // Added for exact date holding
+  toDate       DateTime? // Added for exact date holding
+  timeSlot     String?           @db.VarChar(20) // MORNING, EVENING, NIGHT
+  holdBy       String?
+  holdMember   Member?           @relation(fields: [holdBy], references: [Membership_No])
+  hallId Int
+  hall Hall @relation(fields: [hallId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("hallholdings")
+}
+
+model HallOutOfOrder {
+  id     Int  @id @unique @default(autoincrement())
+  hallId Int
+  hall   Hall @relation(fields: [hallId], references: [id], onDelete: Cascade)
+
+  reason    String   @db.VarChar(300)
+  startDate DateTime
+  endDate   DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  createdBy String @default("")
+  updatedBy String @default("")
+
+  @@index([hallId])
+  @@index([startDate])
+  @@index([endDate])
+
+  @@map("halloutoforder")
+}
+
+model HallReservation {
+  id           Int      @id @default(autoincrement())
+  hallId       Int
+  hall         Hall     @relation(fields: [hallId], references: [id])
+  reservedFrom DateTime
+  reservedTo   DateTime
+  reservedBy   Int
+  timeSlot     String   @default("MORNING") @db.VarChar(20) // MORNING, EVENING, NIGHT
+  admin        Admin    @relation(fields: [reservedBy], references: [id])
+  remarks      String?  @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  createdBy String @default("")
+  updatedBy String @default("")
+
+  @@index([hallId])
+  @@index([reservedFrom, reservedTo])
+
+  @@map("hallreservation")
+}
+
+model LawnOutOfOrder {
+  id     Int  @id @unique @default(autoincrement())
+  lawnId Int
+  lawn   Lawn @relation(fields: [lawnId], references: [id], onDelete: Cascade)
+
+  reason    String   @db.VarChar(300)
+  startDate DateTime
+  endDate   DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  createdBy String @default("")
+  updatedBy String @default("")
+
+  @@index([lawnId])
+  @@index([startDate])
+  @@index([endDate])
+
+  @@map("lawnoutoforder")
+}
+model Lawn {
+  id             Int          @id @default(autoincrement())
+  description    String?       @db.VarChar(200)
+  lawnCategoryId Int
+  lawnCategory   LawnCategory @relation(fields: [lawnCategoryId], references: [id])
+  minGuests      Int?         @default(0)
+  maxGuests      Int          @default(0)
+  memberCharges  Decimal      @default(0.00) @db.Decimal(30, 2)
+  guestCharges   Decimal      @default(0.00) @db.Decimal(30, 2)
+  corporateCharges Decimal     @default(0.00) @db.Decimal(30, 2)
+  order            Int         @default(0)
+  isActive       Boolean      @default(true)
+  isOutOfService Boolean      @default(false)
+
+  outOfOrders LawnOutOfOrder[]
+  holdings lawnHoldings[]
+
+  isBooked     Boolean           @default(false)
+  bookings     LawnBooking[]
+  reservations LawnReservation[]
+  isReserved   Boolean           @default(false)
+
+  createdBy String @default("")
+  updatedBy String @default("")
+
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@map("lawn")
+}
+model lawnHoldings {
+  id Int @id @unique @default(autoincrement())
+  onHold       Boolean           @default(false)
+  holdExpiry   DateTime?
+  fromDate     DateTime? // Added for exact date holding
+  toDate       DateTime? // Added for exact date holding
+  timeSlot     String?           @db.VarChar(20) // MORNING, EVENING, NIGHT
+  holdBy       String?
+  holdMember   Member?           @relation(fields: [holdBy], references: [Membership_No])
+  lawnId Int
+  lawn Lawn @relation(fields: [lawnId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("lawnholdings")
+}
+
+model LawnCategory {
+  id        Int      @unique @default(autoincrement())
+  category  String   @db.VarChar(200)
+  order            Int         @default(0)
+  images    Json     @default("[]")
+  lawns     Lawn[]
+
+  createdBy String @default("")
+  updatedBy String @default("")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("lawncategory")
+}
+
+model LawnReservation {
+  id           Int      @id @default(autoincrement())
+  lawnId       Int
+  lawn         Lawn     @relation(fields: [lawnId], references: [id])
+  reservedFrom DateTime
+  reservedTo   DateTime
+  timeSlot     String   @default("MORNING") @db.VarChar(20) // MORNING, EVENING, NIGHT
+  reservedBy   Int
+  admin        Admin    @relation(fields: [reservedBy], references: [id])
+  remarks      String?  @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  createdBy String @default("")
+  updatedBy String @default("")
+
+  @@index([lawnId])
+  @@index([reservedFrom, reservedTo])
+
+  @@map("lawnreservation")
+}
+
+model PhotoshootReservation {
+  id           Int        @id @default(autoincrement())
+  photoshootId Int
+  photoshoot   Photoshoot @relation(fields: [photoshootId], references: [id])
+  reservedFrom DateTime
+  reservedTo   DateTime
+  timeSlot     String     @default("MORNING") @db.VarChar(20)
+  reservedBy   Int
+  admin        Admin      @relation(fields: [reservedBy], references: [id])
+  remarks      String?    @db.VarChar(500)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  createdBy String @default("")
+  updatedBy String @default("")
+
+  @@index([photoshootId])
+  @@index([reservedFrom, reservedTo])
+
+  @@map("photoshootreservation")
+}
+
+// photoshoot
+model Photoshoot {
+  id          Int    @id @unique @default(autoincrement())
+  description String? @db.VarChar(200)
+
+  memberCharges Decimal @default(0.00) @db.Decimal(30, 2)
+  guestCharges  Decimal @default(0.00) @db.Decimal(30, 2)
+  corporateCharges Decimal @default(0.00) @db.Decimal(30, 2)
+  images        Json    @default("[]")
+  isActive Boolean @default(true)
+  outOfOrders PhotoshootOutOfOrder[]
+  isBooked   Boolean             @default(false)
+  bookings   PhotoshootBooking[]
+  reservations PhotoshootReservation[]
+  isReserved   Boolean             @default(false)
+
+  createdBy String @default("")
+  updatedBy String @default("")
+
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  @@map("photoshoot")
+}
+
+model PhotoshootOutOfOrder {
+  id           Int        @id @unique @default(autoincrement())
+  photoshootId Int
+  photoshoot   Photoshoot @relation(fields: [photoshootId], references: [id], onDelete: Cascade)
+
+  reason    String   @db.VarChar(300)
+  startDate DateTime
+  endDate   DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  createdBy String @default("")
+  updatedBy String @default("")
+
+  @@index([photoshootId])
+  @@index([startDate])
+  @@index([endDate])
+
+  @@map("photoshootoutoforder")
+}
+
+// sports
+enum ChargeType {
+  PER_DAY
+  PER_MONTH
+  PER_GAME
+  PER_HOUR
+}
+
+model Sport {
+  id          Int     @unique @default(autoincrement())
+  activity    String  @db.VarChar(100)
+  description String? @db.VarChar(300)
+  isActive    Boolean @default(true)
+  order       Int     @default(0)
+  images      Json    @default("[]") // Array of image URLs, max 5
+
+  // Timing for Gents: JSON object with each day of the week
+  // Format: { "monday": { "open": "09:00 AM", "close": "05:00 PM", "isClosed": false }, ... }
+  timing Json? @default("{}")
+
+  // Timing for Ladies: JSON object with each day of the week
+  timingLadies Json? @default("{}")
+
+  // Dress Code (rich text)
+  dressCodeDos   String? @db.LongText
+  dressCodeDonts String? @db.LongText
+
+  // General Do's and Don'ts (rich text)
+  dos   String? @db.LongText
+  donts String? @db.LongText
+
+  subscriptions SportSubscription[]
+
+  sportCharge SportCharge[]
+  createdBy String @default("")
+  updatedBy String @default("")
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@map("sport")
+}
+
+model SportCharge {
+  id         Int        @unique @default(autoincrement())
+  activityId Int
+  chargeType ChargeType
+
+  memberCharges         Decimal? @default(0.00) @db.Decimal(30, 2)
+  spouseCharges         Decimal? @default(0.00) @db.Decimal(30, 2)
+  childrenCharges       Decimal? @default(0.00) @db.Decimal(30, 2)
+  guestCharges          Decimal? @default(0.00) @db.Decimal(30, 2)
+  affiliatedClubCharges Decimal? @default(0.00) @db.Decimal(30, 2)
+
+  activity  Sport    @relation(fields: [activityId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  createdBy String @default("")
+  updatedBy String @default("")
+
+  @@map("sportcharge")
+}
+
+// affiliated clubs
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+
+model AffiliatedClub {
+  id          Int     @id @default(autoincrement())
+  name        String  @db.VarChar(200)
+  location    String? @db.VarChar(300)
+  contactNo   String? @db.VarChar(50)
+  email       String? @db.VarChar(100)
+  description String? @db.Text
+  order       Int     @default(0)
+  image       String?
+  isActive    Boolean @default(true)
+
+  requests     AffiliatedClubRequest[]
+  affBookings  AffClubBooking[]
+  createdBy String @default("")
+  updatedBy String @default("")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("affiliatedclub")
+}
+
+model AffiliatedClubRequest {
+  id               Int           @id @default(autoincrement())
+  membershipNo     String
+  affiliatedClubId Int
+  affiliatedClub   AffiliatedClub @relation(fields: [affiliatedClubId], references: [id], onDelete: Cascade)
+
+
+  requestedDate DateTime  
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  createdBy String @default("")
+  updatedBy String @default("")
+
+  @@index([membershipNo])
+  @@index([affiliatedClubId])
+
+  @@map("affiliatedclubrequest")
+}
+
+// Content Management
+
+model Event {
+  id          Int      @id @default(autoincrement())
+  title       String
+  images      Json     @default("[]") // Array of image URLs
+  startDate   DateTime
+  endDate     DateTime
+  time        String?
+  venue       String?
+  description String?  @db.Text
+
+  createdBy String @default("")
+  updatedBy String @default("")
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("event")
+}
+
+model ClubRule {
+  id        Int      @id @default(autoincrement())
+  content   String   @db.LongText // Rich text content
+
+  type      String   @default("CLUB") // CLUB, ROOM, HALL, LAWN, PHOTOSHOOT
+  isActive  Boolean  @default(true)
+
+  createdBy String @default("")
+  updatedBy String @default("")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("clubrule")
+}
+
+// MESSING MODULE
+
+model MessingCategory {
+  id        Int      @id @unique @default(autoincrement())
+  category  String   @db.VarChar(200)
+  order     Int      @default(0)
+  images    Json     @default("[]") // Array of image URLs, max 5
+  
+  subCategories MessingSubCategory[]
+
+  createdBy String @default("")
+  updatedBy String @default("")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("messingcategory")
+}
+
+model MessingSubCategory {
+  id                Int             @id @unique @default(autoincrement())
+  messingCategoryId Int
+  messingCategory   MessingCategory @relation(fields: [messingCategoryId], references: [id], onDelete: Cascade)
+  
+  name        String  @db.VarChar(200)
+  order       Int     @default(0)
+  
+  items       MessingItem[]
+
+  createdBy String @default("")
+  updatedBy String @default("")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([messingCategoryId])
+
+  @@map("messingsubcategory")
+}
+
+model MessingItem {
+  id                   Int                @id @unique @default(autoincrement())
+  messingSubCategoryId Int
+  messingSubCategory   MessingSubCategory @relation(fields: [messingSubCategoryId], references: [id], onDelete: Cascade)
+  
+  name        String  @db.VarChar(200)
+  description String? @db.Text
+  price       Decimal @default(0.00) @db.Decimal(30, 2)
+  order       Int     @default(0)
+  
+  createdBy String @default("")
+  updatedBy String @default("")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([messingSubCategoryId])
+
+  @@map("messingitem")
+}
+
+model Announcement {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?  @db.Text
+  date        DateTime
+  isActive    Boolean  @default(true)
+  createdBy String @default("")
+  updatedBy String @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("announcement")
+}
+
+model AboutUs {
+  id        Int      @id @default(autoincrement())
+  clubInfo  String   @db.LongText
+  createdBy String @default("")
+  updatedBy String @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("aboutus")
+}
+
+model ClubHistory {
+  id          Int      @id @default(autoincrement())
+  description String   @db.Text
+  image       String?  
+  createdBy String @default("")
+  updatedBy String @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("clubhistory")
+}
+
+model PromotionalAd {
+  id          Int      @id @default(autoincrement())
+  title       String?
+  description String?  @db.Text
+  image       String
+  isActive    Boolean  @default(true)
+
+  createdBy String @default("")
+  updatedBy String @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("promotionalad")
+}
+
+
+model deliveredNotis{
+  id          Int      @id @default(autoincrement())
+  notificationId Int
+  notification Notification @relation(fields: [notificationId], references: [id])
+  seen Boolean @default(false)
+  member String
+  deliveredTo Member @relation(fields: [member], references: [Membership_No])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("deliverednotis")
+}
+
+model RoomCancellationRequest {
+  id        Int      @id @default(autoincrement())
+  bookingId Int
+  booking   RoomBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  reason    String?  @db.Text
+  requestedBy String?  @db.Text
+  status    RequestStatus @default(PENDING)
+  adminRemarks String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([bookingId])
+  @@index([status])
+
+  @@map("roomcancellationrequest")
+}
+
+model HallCancellationRequest {
+  id        Int      @id @default(autoincrement())
+  bookingId Int
+  booking   HallBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  reason    String?  @db.Text
+  requestedBy String?  @db.Text
+  status    RequestStatus @default(PENDING)
+  adminRemarks String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([bookingId])
+  @@index([status])
+
+  @@map("hallcancellationrequest")
+}
+
+model LawnCancellationRequest {
+  id        Int      @id @default(autoincrement())
+  bookingId Int
+  booking   LawnBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  reason    String?  @db.Text
+  requestedBy String?  @db.Text
+  status    RequestStatus @default(PENDING)
+  adminRemarks String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([bookingId])
+  @@index([status])
+
+  @@map("lawncancellationrequest")
+}
+
+
+model Notification {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?  @db.Text
+  delivered   Boolean  @default(false)
+  deliveries deliveredNotis[]
+  createdBy String @default("")
+  updatedBy String @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("notification")
+}
+
+
+enum FeedbackStatus {
+  PENDING
+  IN_PROCESS
+  COMPLETED
+}
+
+model Feedback {
+  id            Int            @id @default(autoincrement())
+  memberNo      String
+  member        Member         @relation(fields: [memberNo], references: [Membership_No])
+  categoryId    Int?
+  category      FeedbackCategory? @relation(fields: [categoryId], references: [id])
+  subCategoryId    Int?
+  subCategory      FeedbackSubCategory? @relation(fields: [subCategoryId], references: [id])
+  otherSubCategory String?
+  subject          String
+  message       String         @db.Text
+  status        FeedbackStatus @default(PENDING)
+  remarks       FeedbackRemark[]
+
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([memberNo])
+  @@index([categoryId])
+  @@index([subCategoryId])
+
+  @@map("feedback")
+}
+
+model FeedbackCategory {
+  id        Int        @id @default(autoincrement())
+  name      String     @unique
+  feedbacks Feedback[]
+
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@map("feedbackcategory")
+}
+
+model FeedbackSubCategory {
+  id        Int        @id @default(autoincrement())
+  name      String     @unique
+  feedbacks Feedback[]
+
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@map("feedbacksubcategory")
+}
+
+model FeedbackRemark {
+  id         Int      @id @default(autoincrement())
+  feedbackId Int
+  feedback   Feedback @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
+  adminName  String
+  remark     String   @db.Text
+
+  createdAt  DateTime @default(now())
+
+  @@index([feedbackId])
+
+  @@map("feedbackremark")
+}
+
+model PhotoshootCancellationRequest {
+  id        Int      @id @default(autoincrement())
+  bookingId Int
+  booking   PhotoshootBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  reason    String?  @db.Text
+  requestedBy String?  @db.Text
+  status    RequestStatus @default(PENDING)
+  adminRemarks String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([bookingId])
+  @@index([status])
+
+  @@map("photoshootcancellationrequest")
+}
+
+// ==================== Affiliated Club Bookings ====================
+
+model AffClubBooking {
+  id                     Int           @id @default(autoincrement())
+  affiliatedClubId       Int
+  affiliatedClub         AffiliatedClub @relation(fields: [affiliatedClubId], references: [id])
+  affiliatedMembershipNo String        @db.VarChar(100)
+
+  rooms AffClubBookingRoom[]
+
+  checkIn  DateTime
+  checkOut DateTime
+
+  totalPrice    Decimal       @default(0.00) @db.Decimal(30, 2)
+  paymentStatus PaymentStatus @default(UNPAID)
+  paidAmount    Decimal       @default(0.00) @db.Decimal(30, 2)
+  pendingAmount Decimal       @default(0.00) @db.Decimal(30, 2)
+  paymentMode   String        @default("CASH")
+
+  numberOfAdults   Int @default(1)
+  numberOfChildren Int @default(0)
+
+  guestName    String? @db.Text
+  guestContact String? @db.Text
+  guestCNIC    String? @db.Text
+
+  specialRequests String? @db.Text
+  remarks         String? @db.Text
+
+  extraCharges Json? @default("[]")
+
+  isCancelled    Boolean @default(false)
+  isClosed       Boolean @default(false)
+  isConfirmed    Boolean @default(false)
+  refundAmount   Decimal @default(0.00) @db.Decimal(30, 2)
+  refundReturned Boolean @default(false)
+
+  cancellationRequests AffClubCancellationRequest[]
+
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([affiliatedClubId])
+
+  @@map("affclubbooking")
+}
+
+model AffClubCancellationRequest {
+  id        Int      @id @default(autoincrement())
+  bookingId Int
+  booking   AffClubBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  reason    String?  @db.Text
+  requestedBy String?  @db.Text
+  status    RequestStatus @default(PENDING)
+  adminRemarks String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([bookingId])
+  @@index([status])
+
+  @@map("affclubcancellationrequest")
+}
+
+model AffClubBookingRoom {
+  id             Int            @id @default(autoincrement())
+  bookingId      Int
+  booking        AffClubBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  roomId         Int
+  room           Room           @relation(fields: [roomId], references: [id])
+  priceAtBooking Decimal        @db.Decimal(30, 2)
+
+  @@index([bookingId])
+  @@index([roomId])
+
+  @@map("affclubbookingroom")
+}
+
+model ContactUs {
+  id           Int      @id @default(autoincrement())
+  category     String   @unique // e.g., "Info Desk", "Event Booking"
+  phoneNumbers Json     @default("[]") // Storing as ["num1", "num2"]
+  time         String   // e.g., "09:00 AM - 05:00 PM"
+  email        String?
+  
+  createdBy String @default("")
+  updatedBy String @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("contactus")
+}
+
+model BillPaymentHistory {
+  id            Int      @id @default(autoincrement())
+  membershipNo  String
+  member        Member   @relation(fields: [membershipNo], references: [Membership_No])
+  amount        Decimal  @db.Decimal(20, 2)
+  status        String   @default("PENDING") // PENDING, PAID, CANCELLED
+  remarks       String?  @db.Text
+  consumerNo    String?  @unique
+  paidAt        DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("billpaymenthistory")
+}
+
+enum attemptStatus {
+  SUCCESS
+  FAILURE
+}
+
+
+model ThrottleLog {
+  id Int @id @default(autoincrement())
+  email String
+  attempts Int
+  failed Int
+  success Int
+
+  recentAttempt Json @default("[]") //attemptAt, status, path
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("throttlelog")
+}

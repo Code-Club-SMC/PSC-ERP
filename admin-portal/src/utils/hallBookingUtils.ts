@@ -1,0 +1,478 @@
+import { differenceInCalendarDays, addDays, format, parse, isSameDay } from "date-fns";
+import {
+  Hall,
+  HallBooking,
+  HallBookingForm,
+  HallBookingTime,
+  PricingType,
+  PaymentStatus,
+} from "@/types/hall-booking.type";
+import { DateStatus } from "@/types/room-booking.type";
+
+// Helper to parse date strings (yyyy-MM-dd or ISO) as a local Date object without UTC shifts for simple dates
+export const parseLocalDate = (dateStr: string): Date => {
+  if (!dateStr) return new Date();
+
+  const str = String(dateStr);
+
+  // If it's a full ISO string (contains T), parse it directly to allow JS to handle timezone shift
+  // In our app, backend sends 00:00 PKT which might be 19:00 UTC previous day if it's sent as UTC ISO.
+  // Actually, if it contains 'T', regular new Date(str) is safest if we want the actual moment,
+  // BUT the user's issue is that 'T' strings were being stripped and parsed as local YYYY-MM-DD.
+  if (str.includes('T')) {
+    return new Date(str);
+  }
+
+  // Handle YYYY-MM-DD or similar date-only strings by splitting and creating local date
+  const datePart = str.split(' ')[0]; // Handle cases like "2025-12-27 00:00:00"
+  const parts = datePart.split('-');
+  if (parts.length === 3) {
+    const [y, m, d] = parts.map(Number);
+    const date = new Date(y, m - 1, d);
+    if (!isNaN(date.getTime())) return date;
+  }
+
+  // Fallback
+  const fallback = new Date(dateStr);
+  return isNaN(fallback.getTime()) ? new Date() : fallback;
+};
+
+export const hallInitialFormState: HallBookingForm = {
+  reservationId: "",
+  membershipNo: "",
+  memberName: "",
+  memberId: "",
+  category: "Hall",
+  hallId: "",
+  bookingDate: "",
+  eventType: "",
+  eventTime: "DAY",
+  pricingType: "member",
+  totalPrice: 0,
+  numberOfGuests: 0,
+  paymentStatus: "UNPAID",
+  paidAmount: 0,
+  pendingAmount: 0,
+  paymentMode: "CASH",
+  card_number: "",
+  check_number: "",
+  bank_name: "",
+  paidBy: "MEMBER",
+  guestName: "",
+  guestContact: "",
+  guestCNIC: "",
+  remarks: "",
+  endDate: "",
+  numberOfDays: 1,
+  newPaymentAmount: 0,
+  existingPaidAmount: 0,
+  bookingDetails: [],
+  heads: [],
+};
+
+export const calculateHallPrice = (
+  halls: Hall[],
+  hallId: string,
+  pricingType: PricingType,
+  bookingDetails: { date: string; timeSlot: string }[]
+) => {
+  if (!hallId) return 0;
+
+  const hall = halls.find((h) => h.id.toString() === hallId);
+  if (!hall) return 0;
+
+  const basePrice =
+    pricingType === "member"
+      ? Number(hall.chargesMembers || 0)
+      : pricingType === "corporate"
+        ? Number(hall.chargesCorporate || 0)
+        : Number(hall.chargesGuests || 0);
+
+  // If we have granular details, price is per-slot
+  if (bookingDetails && bookingDetails.length > 0) {
+    return basePrice * bookingDetails.length;
+  }
+
+  return basePrice;
+};
+
+export const calculateHallAccountingValues = (
+  paymentStatus: PaymentStatus,
+  totalPrice: number,
+  paidAmount: number
+) => {
+  let paid = 0;
+  let owed = totalPrice;
+
+  if (paymentStatus === "PAID") {
+    // If PAID, but paidAmount is already greater than totalPrice (overpayment), 
+    // keep the overpayment instead of capping at totalPrice.
+    paid = Math.max(totalPrice, paidAmount);
+    owed = totalPrice - paid;
+  } else if (paymentStatus === "HALF_PAID" || paymentStatus === "ADVANCE_PAYMENT") {
+    paid = paidAmount;
+    owed = totalPrice - paidAmount;
+  }
+
+  return { paid, owed, pendingAmount: owed };
+};
+
+
+// Enhanced function to get hall date and time slot statuses
+export const getHallDateTimeStatuses = (
+  hallId: string,
+  bookings: HallBooking[],
+  halls: Hall[],
+  reservations: any[] = []
+) => {
+  const hall = halls.find((h) => h.id.toString() === hallId);
+  if (!hall) return {};
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const statusMap: Record<string, { disabled: boolean; unavailableTimeSlots: string[] }> = {};
+
+  // Get all bookings for this hall
+  const hallBookings = bookings.filter(
+    (booking) => booking.hallId?.toString() === hallId
+  );
+
+  // Get all reservations for this hall
+  const hallReservations = reservations.filter(
+    (reservation) => reservation.hallId?.toString() === hallId
+  );
+
+  // Process next 60 days
+  for (let i = 0; i < 60; i++) {
+    const date = new Date(today);
+    date.setDate(today.getDate() + i);
+    const dateString = date.toISOString().split('T')[0];
+
+    // Check if hall is out of order for this date
+    const isOutOfOrder = isHallOutOfOrderForDate(hall, date);
+
+    // Get unavailable time slots for this date
+    const unavailableTimeSlots = getUnavailableTimeSlotsForDate(
+      date,
+      hallId,
+      hallBookings,
+      hallReservations
+    );
+
+    // Date is disabled only if ALL time slots are unavailable OR hall is out of order
+    const allTimeSlotsUnavailable = unavailableTimeSlots.length === 3; // MORNING, EVENING, NIGHT
+    const disabled = isOutOfOrder || allTimeSlotsUnavailable;
+
+    statusMap[dateString] = {
+      disabled,
+      unavailableTimeSlots: disabled ? ['DAY', 'NIGHT'] : unavailableTimeSlots
+    };
+  }
+
+  return statusMap;
+};
+
+// Check if hall is out of order for a specific date
+export const isHallOutOfOrderForDate = (hall: Hall, date: Date): boolean => {
+  const targetDate = new Date(date);
+  targetDate.setHours(0, 0, 0, 0);
+
+  // Check new outOfOrders relation
+  if (hall.outOfOrders && Array.isArray(hall.outOfOrders)) {
+    const isOut = hall.outOfOrders.some(period => {
+      const start = new Date(period.startDate);
+      const end = new Date(period.endDate);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(0, 0, 0, 0);
+      return targetDate >= start && targetDate <= end;
+    });
+    if (isOut) return true;
+  }
+
+  // Fallback to legacy fields or manual flag
+  if (hall.outOfServiceFrom && hall.outOfServiceTo) {
+    const outOfServiceFrom = new Date(hall.outOfServiceFrom);
+    const outOfServiceTo = new Date(hall.outOfServiceTo);
+
+    outOfServiceFrom.setHours(0, 0, 0, 0);
+    outOfServiceTo.setHours(0, 0, 0, 0);
+
+    if (targetDate >= outOfServiceFrom && targetDate <= outOfServiceTo) return true;
+  }
+
+  return hall.isOutOfService;
+};
+
+// Get unavailable time slots for a specific date
+export const getUnavailableTimeSlotsForDate = (
+  date: Date,
+  hallId: string,
+  bookings: HallBooking[],
+  reservations: any[]
+): string[] => {
+  // Format date as YYYY-MM-DD in local timezone
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const dateString = `${year}-${month}-${day}`;
+
+  const unavailableSlots: string[] = [];
+
+  // Check bookings for this date (already filtered by hallId in callers, but we double check here)
+  bookings.filter(booking => booking.hallId?.toString() === hallId).forEach(booking => {
+    // Skip cancelled bookings
+    if ((booking as any).isCancelled) return;
+
+    // 1. Check granular bookingDetails if available
+    if (booking.bookingDetails && Array.isArray(booking.bookingDetails)) {
+      booking.bookingDetails.forEach((detail: any) => {
+        // detail.date is a string like "2025-12-27". 
+        // parseLocalDate(detail.date) gives a local Date object.
+        const dDate = parseLocalDate(detail.date);
+        const detailDateStr = format(dDate, "yyyy-MM-dd");
+        if (detailDateStr === dateString && detail.timeSlot) {
+          const detailSlot = detail.timeSlot.toUpperCase();
+          if (!unavailableSlots.includes(detailSlot)) {
+            unavailableSlots.push(detailSlot);
+          }
+        }
+      });
+    }
+    // 2. Fallback to legacy bookingTime for backward compatibility
+    else if (booking.bookingTime) {
+      const bDate = parseLocalDate(booking.bookingDate as string);
+      const bEndDate = booking.endDate ? parseLocalDate(booking.endDate as string) : bDate;
+
+      // Normalize dates to midnight
+      bDate.setHours(0, 0, 0, 0);
+      bEndDate.setHours(0, 0, 0, 0);
+      const targetDate = parseLocalDate(dateString); // dateString is yyyy-MM-dd
+      targetDate.setHours(0, 0, 0, 0);
+
+      if (targetDate >= bDate && targetDate <= bEndDate) {
+        const normalizedSlot = booking.bookingTime?.toUpperCase();
+        if (normalizedSlot && !unavailableSlots.includes(normalizedSlot)) {
+          unavailableSlots.push(normalizedSlot);
+        }
+      }
+    }
+  });
+
+  // Check reservations for this date
+  const dateReservations = reservations.filter(reservation => {
+    const reservedFrom = new Date(reservation.reservedFrom);
+    const reservedTo = new Date(reservation.reservedTo);
+
+    reservedFrom.setHours(0, 0, 0, 0);
+    reservedTo.setHours(0, 0, 0, 0);
+
+    const targetDate = new Date(date);
+    targetDate.setHours(0, 0, 0, 0);
+
+    return targetDate >= reservedFrom && targetDate <= reservedTo;
+  });
+
+  dateReservations.forEach(reservation => {
+    const rSlot = reservation.timeSlot?.toUpperCase();
+    if (rSlot && !unavailableSlots.includes(rSlot)) {
+      unavailableSlots.push(rSlot);
+    }
+  });
+
+  // Check holdings for this date
+  const hall = (window as any).allHalls?.find((h: any) => h.id.toString() === hallId);
+  if (hall && hall.holdings && Array.isArray(hall.holdings)) {
+    hall.holdings.forEach((hold: any) => {
+      if (!hold.onHold) return;
+      const holdExpiry = new Date(hold.holdExpiry);
+      if (holdExpiry < new Date()) return;
+
+      if (hold.fromDate && hold.toDate) {
+        const hStart = format(parseLocalDate(hold.fromDate), "yyyy-MM-dd");
+        const hEnd = format(parseLocalDate(hold.toDate), "yyyy-MM-dd");
+        if (dateString >= hStart && dateString <= hEnd) {
+          if (hold.timeSlot && !unavailableSlots.includes(hold.timeSlot)) {
+            unavailableSlots.push(hold.timeSlot);
+          } else if (!hold.timeSlot) {
+            // Global hold
+            ['DAY', 'NIGHT'].forEach(slot => {
+              if (!unavailableSlots.includes(slot)) unavailableSlots.push(slot);
+            });
+          }
+        }
+      } else {
+        // Legacy hold (global)
+        ['DAY', 'NIGHT'].forEach(slot => {
+          if (!unavailableSlots.includes(slot)) unavailableSlots.push(slot);
+        });
+      }
+    });
+  }
+
+  return unavailableSlots;
+};
+
+// Get available time slots for a specific date and hall
+export const getAvailableTimeSlots = (
+  hallId: string,
+  date: string,
+  bookings: HallBooking[],
+  halls: Hall[],
+  reservations: any[] = []
+): string[] => {
+  const allTimeSlots = ['DAY', 'NIGHT'];
+
+  if (!date || !hallId) return allTimeSlots;
+
+  const hall = halls.find((h) => h.id.toString() === hallId);
+  if (!hall) return allTimeSlots;
+
+  // Filter bookings for this specific hall
+  const hallBookings = bookings.filter(
+    (booking) => booking.hallId?.toString() === hallId
+  );
+
+  // Check if hall is out of order for the selected date
+  if (isHallOutOfOrderForDate(hall, parseLocalDate(date))) {
+    return [];
+  }
+
+  // Get unavailable time slots for the selected date
+  const unavailableSlots = getUnavailableTimeSlotsForDate(
+    parseLocalDate(date),
+    hallId,
+    hallBookings,
+    reservations
+  );
+
+  return allTimeSlots.filter(slot =>
+    !unavailableSlots.includes(slot)
+  );
+};
+
+export const checkHallConflicts = (
+  hallId: string,
+  startDate: string,
+  endDate: string,
+  timeSlot: string,
+  bookings: HallBooking[],
+  halls: Hall[],
+  reservations: any[] = [],
+  excludeBookingId?: string,
+  bookingDetails?: { date: string, timeSlot: string }[]
+) => {
+  const hall = halls.find(h => h.id.toString() === hallId);
+  if (!hall) return { hasConflict: false };
+
+  const start = parseLocalDate(startDate);
+  const end = endDate ? parseLocalDate(endDate) : start;
+
+  const numberOfDays = Math.abs(differenceInCalendarDays(end, start)) + 1;
+
+  for (let i = 0; i < numberOfDays; i++) {
+    const targetDate = addDays(start, i);
+    const dateString = format(targetDate, "yyyy-MM-dd");
+
+    // Get time slot for this specific date
+    let currentSlot = timeSlot;
+    if (bookingDetails && Array.isArray(bookingDetails)) {
+      const detail = bookingDetails.find(d => {
+        return isSameDay(parseLocalDate(d.date), targetDate);
+      });
+      if (detail) currentSlot = detail.timeSlot;
+    }
+
+    // 1. Check Out of Order
+    if (isHallOutOfOrderForDate(hall, targetDate)) {
+      return {
+        hasConflict: true,
+        type: 'OUT_OF_ORDER',
+        date: dateString,
+        message: `Hall is Out of Service on ${format(targetDate, "MMM d, yyyy")}`
+      };
+    }
+
+    // 2. Check Bookings
+    const isBooked = bookings.some(b => {
+      if ((b as any).isCancelled) return false;
+      if (excludeBookingId && b.id?.toString() === excludeBookingId?.toString()) return false;
+
+      // Check granular details first
+      if (b.bookingDetails && Array.isArray(b.bookingDetails)) {
+        return b.hallId?.toString() === hallId && b.bookingDetails.some((d: any) => {
+          const dDate = parseLocalDate(d.date);
+          return isSameDay(dDate, targetDate) && d.timeSlot?.toUpperCase() === currentSlot?.toUpperCase();
+        });
+      }
+
+      // Fallback to legacy
+      const bDate = parseLocalDate(b.bookingDate as string);
+      return b.hallId?.toString() === hallId && isSameDay(bDate, targetDate) && b.bookingTime?.toUpperCase() === currentSlot?.toUpperCase();
+    });
+
+    if (isBooked) {
+      return {
+        hasConflict: true,
+        type: 'BOOKED',
+        date: dateString,
+        message: `Hall is already Booked for ${currentSlot} on ${format(targetDate, "MMM d, yyyy")}`
+      };
+    }
+
+    // 3. Check Reservations
+    const isReserved = reservations.some(r => {
+      const rStart = new Date(r.reservedFrom);
+      const rEnd = new Date(r.reservedTo);
+      rStart.setHours(0, 0, 0, 0);
+      rEnd.setHours(0, 0, 0, 0);
+
+      const d = new Date(targetDate);
+      d.setHours(0, 0, 0, 0);
+
+      return r.hallId?.toString() === hallId && d >= rStart && d <= rEnd && r.timeSlot?.toUpperCase() === currentSlot?.toUpperCase();
+    });
+
+    if (isReserved) {
+      return {
+        hasConflict: true,
+        type: 'RESERVED',
+        date: dateString,
+        message: `Hall is Reserved for ${currentSlot} on ${format(targetDate, "MMM d, yyyy")}`
+      };
+    }
+
+    // 4. Check Holdings
+    if (hall.holdings && Array.isArray(hall.holdings)) {
+      const isHeld = hall.holdings.some(hold => {
+        if (!hold.onHold) return false;
+        const holdExpiry = new Date(hold.holdExpiry);
+        if (holdExpiry < new Date()) return false;
+
+        if (hold.fromDate && hold.toDate) {
+          const hStart = format(new Date(hold.fromDate), "yyyy-MM-dd");
+          const hEnd = format(new Date(hold.toDate), "yyyy-MM-dd");
+
+          if (dateString >= hStart && dateString <= hEnd) {
+            return !hold.timeSlot || hold.timeSlot === currentSlot;
+          }
+          return false;
+        }
+
+        // Legacy hold
+        return true;
+      });
+
+      if (isHeld) {
+        return {
+          hasConflict: true,
+          type: 'HELD',
+          date: dateString,
+          message: `Hall is on Hold for ${currentSlot} on ${format(targetDate, "MMM d, yyyy")}`
+        };
+      }
+    }
+  }
+
+  return { hasConflict: false };
+};

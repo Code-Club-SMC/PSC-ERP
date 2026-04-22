@@ -1,0 +1,330 @@
+import {
+  Body,
+  Controller,
+  Patch,
+  Post,
+  Get,
+  Query,
+  Req,
+  Res,
+  UseGuards,
+  Delete,
+  HttpException,
+  HttpStatus,
+  UnauthorizedException,
+} from '@nestjs/common';
+import type { Request, Response } from 'express';
+import { CreateAdminDto } from './dtos/create-admin.dto';
+import { AuthService } from './auth.service';
+import { LoginAdminDto } from './dtos/login-admin.dto';
+import { JwtRefGuard } from 'src/common/guards/jwt-refresh.guard';
+import { JwtAccGuard } from 'src/common/guards/jwt-access.guard';
+import { RolesGuard } from 'src/common/guards/roles.guard';
+import { Roles } from 'src/common/decorators/roles.decorator';
+import { RolesEnum } from 'src/common/constants/roles.enum';
+import { OTP_MSG } from 'src/utils/messages';
+import { generateRandomNumber } from './utils/genOTP';
+import { Throttle } from '@nestjs/throttler';
+
+import { ThrottleGuard } from 'src/common/guards/throttler.guard';
+import { ThrottleEmail } from 'src/common/decorators/throttle-email.decorator';
+
+@Controller('auth')
+export class AuthController {
+  constructor(private readonly authService: AuthService) { }
+
+  @Post('create/super-admin')
+  async createSuperAdmin(@Body() payload: CreateAdminDto) {
+    return await this.authService.createSuperAdmin(payload);
+  }
+
+  @UseGuards(JwtAccGuard, RolesGuard)
+  @Roles(RolesEnum.SUPER_ADMIN)
+  @Patch('update/admin')
+  async updateAdmin(
+    @Query() adminID: { adminID: string },
+    @Body() payload: Partial<CreateAdminDto>,
+    @Req() req: any,
+  ) {
+    const updatedBy = req.user?.name || 'system';
+    return await this.authService.updateAdmin(
+      Number(adminID?.adminID),
+      payload,
+      updatedBy,
+    );
+  }
+
+  @UseGuards(JwtAccGuard, RolesGuard)
+  @Roles(RolesEnum.SUPER_ADMIN)
+  @Post('create/admin')
+  async createAdmin(@Body() payload: CreateAdminDto, @Req() req: any) {
+    const createdBy = req.user?.name || 'system';
+    return await this.authService.createAdmin(payload, createdBy);
+  }
+
+  @UseGuards(JwtAccGuard, RolesGuard)
+  @Roles(RolesEnum.SUPER_ADMIN)
+  @Delete('remove/admin')
+  async removeAdmin(@Query() adminID: { adminID: string }) {
+    return await this.authService.removeAdmin(Number(adminID?.adminID));
+  }
+
+  @Post('login/admin')
+  async loginAdmin(
+    @Body() payload: LoginAdminDto,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    const clientType = req.headers['client-type'] || 'web';
+    const admin = await this.authService.loginAdmin(payload);
+    // return jwt cookie if clientType == web || return jwt/json object if clientType == native/mobile
+    const { access_token, refresh_token } =
+      await this.authService.generateTokens({
+        ...admin,
+        permissions: Array.isArray(admin.permissions) ? admin.permissions : [],
+      });
+    if (clientType === 'web') {
+      res.cookie('access_token', access_token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      });
+      res.cookie('refresh_token', refresh_token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      });
+      return res.status(200).json({ message: 'Login successful' });
+    }
+    return res.status(200).json({
+      access_token,
+      refresh_token,
+    });
+  }
+
+  @Post('logout')
+  async logoutAdmin(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const clientType = req.headers['client-type'] || 'web';
+    if (clientType === 'web') {
+      res.clearCookie('access_token');
+      res.clearCookie('refresh_token');
+      return { message: 'Logout successful' };
+    }
+    return { message: 'Logout successful' };
+  }
+
+  @UseGuards(JwtRefGuard)
+  @Post('refresh-tokens')
+  async refreshTokens(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const clientType = req.headers['client-type'] || 'web';
+    const { id, name, email, role, permissions } = req.user as {
+      id: string | number;
+      name: string;
+      email: string;
+      role: string;
+      permissions?: any[];
+    };
+    const { access_token, refresh_token } =
+      await this.authService.refreshTokens({
+        id,
+        name,
+        email,
+        role,
+        permissions: Array.isArray(permissions) ? permissions : [],
+      });
+    // for web
+    if (clientType === 'web') {
+      res.cookie('access_token', access_token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
+      res.cookie('refresh_token', refresh_token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
+      return { message: 'Login successful' };
+    }
+    // for mobile
+    return { refresh_token: refresh_token, access_token: access_token };
+  }
+
+  @UseGuards(JwtAccGuard)
+  @Get('user-who')
+  async userWho(
+    @Req()
+    req: {
+      user: {
+        id: string | undefined;
+        name: string | undefined;
+        FCMToken: string | null;
+        sessionToken: string | null;
+        role: string | undefined;
+        permissions: any[];
+      };
+    },
+    @Query('fcmToken') fcmToken: string,
+  ) {
+    if (
+      req?.user?.role === RolesEnum.ADMIN ||
+      req?.user?.role === RolesEnum.SUPER_ADMIN
+    ) {
+      const admin = await this.authService.checkAdmin(Number(req.user?.id!));
+      if (!admin) {
+        throw new HttpException('no admin found.', HttpStatus.FORBIDDEN);
+      }
+      return {
+        id: req.user?.id,
+        name: req.user?.name,
+        role: req.user?.role,
+        permissions: req.user?.permissions,
+      };
+    }
+
+    const activeUser = await this.authService.checkActive(String(req.user?.id!));
+    if (!activeUser) {
+      throw new HttpException(
+        'User is not active. Please contact support.',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    // Single-device session enforcement via sessionToken.
+    // sessionToken is generated at login and stored in both the JWT and the DB.
+    // When a new device logs in, a new sessionToken overwrites the DB value,
+    // so the old device's JWT will fail this check on its next userWho call.
+    // FCM token rotation (same device, Firebase refresh) does NOT affect this.
+    const jwtSessionToken = req.user?.sessionToken;
+    if (jwtSessionToken && activeUser.sessionToken && jwtSessionToken !== activeUser.sessionToken) {
+      throw new HttpException(
+        {
+          error: 'SESSION_EXPIRED',
+          message: 'Your account has been logged in from another device.',
+        },
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    // Silently update FCM token if Firebase rotated it on the same device
+    if (fcmToken && activeUser.FCMToken !== fcmToken) {
+      await this.authService.updateFCMToken(String(req.user?.id!), fcmToken);
+    }
+
+    return {
+      id: req.user?.id,
+      name: req.user?.name,
+      FCMToken: fcmToken || activeUser?.FCMToken,
+      role: req.user?.role,
+      permissions: req.user?.permissions,
+    };
+  }
+
+  @UseGuards(JwtAccGuard, RolesGuard)
+  @Roles(RolesEnum.SUPER_ADMIN)
+  @Get('admins')
+  async getAdmins() {
+    return await this.authService.getAdmins();
+  }
+
+  @UseGuards(JwtAccGuard, RolesGuard)
+  @Roles(RolesEnum.SUPER_ADMIN, RolesEnum.ADMIN)
+  @Get('reservations')
+  async getAdminReservations(
+    @Query('adminId') adminId: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+  ) {
+    return await this.authService.getAdminReservations(
+      Number(adminId),
+      fromDate,
+      toDate,
+    );
+  }
+
+  // members
+
+  @UseGuards(ThrottleGuard)
+  @ThrottleEmail({ limit: 3, ttl: 60 })
+  @Post('sendOTP/member')
+  async sendOTP(@Body() payload: { memberID: string }) {
+    const member = await this.authService.getMember(payload?.memberID);
+    if (member.Status == 'blocked')
+      throw new UnauthorizedException(
+        `Your Account Status is ${member.Actual_Status} -- Please contact PSC for queries`,
+      );
+    // generate an OTP and combine with OTP_MSG
+    const otp = generateRandomNumber(4) || 1234;
+    // store in member table
+    await this.authService.storeOTP(member?.Membership_No, otp);
+
+    const emailBody = OTP_MSG
+      .replace('{{memberName}}', member.Name || 'Member')
+      .replace('{{pinCode}}', otp.toString())
+      .replace('{{timestamp}}', new Date().toISOString());
+
+    return await this.authService.sendOTP(
+      member?.Email!,
+      `PIN CODE OF PSC MOBILE APP | (${member?.Membership_No})`,
+      emailBody,
+    );
+  }
+
+  @Post('login/member')
+  async loginMember(
+    @Body() payload: { memberID: string; otp: string; fcmToken: string },
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    const clientType = req.headers['client-type'] || 'web';
+    const authenticated = await this.authService.loginMember(
+      payload?.memberID,
+      Number(payload?.otp),
+      payload?.fcmToken
+    );
+    if (!authenticated) {
+      return res.status(500).json({ message: 'Login un-successful' });
+    }
+
+    const { Name, Email, Status, Membership_No, FCMToken, sessionToken } = authenticated;
+
+    const { access_token, refresh_token } =
+      await this.authService.generateTokens({
+        name: Name,
+        email: Email!,
+        status: Status,
+        id: Membership_No,
+        FCMToken: FCMToken ?? undefined,
+        sessionToken,
+      });
+    if (clientType === 'web') {
+      res.cookie('access_token', access_token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: true,
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
+      res.cookie('refresh_token', refresh_token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: true,
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
+      return res.status(200).json({ message: 'Login successful' });
+    }
+    return res.status(200).json({
+      access_token,
+      refresh_token,
+    });
+  }
+}

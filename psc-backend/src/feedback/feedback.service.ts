@@ -1,0 +1,142 @@
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { FeedbackStatus } from '@prisma/client';
+import { AddFeedbackRemarkDto, CreateFeedbackCategoryDto, CreateFeedbackDto, CreateFeedbackSubCategoryDto } from './dtos/feedback.dto';
+import { NotificationService } from 'src/notification/notification.service';
+
+@Injectable()
+export class FeedbackService {
+    constructor(
+        private prisma: PrismaService,
+        private notificationService: NotificationService
+    ) { }
+
+    async findAll() {
+        return this.prisma.feedback.findMany({
+            include: {
+                member: {
+                    select: {
+                        Name: true,
+                        Membership_No: true,
+                        Contact_No: true,
+                        Email: true,
+                    },
+                },
+                category: true,
+                subCategory: true,
+                remarks: {
+                    orderBy: { createdAt: 'desc' },
+                },
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+    }
+
+    async updateStatus(id: number, status: FeedbackStatus) {
+        const feedback = await this.prisma.feedback.findUnique({ where: { id } });
+        if (!feedback) throw new NotFoundException('Feedback not found');
+
+        const updatedFeedback = await this.prisma.feedback.update({
+            where: { id },
+            data: { status },
+        });
+
+        // Send notification to member
+        await this.notificationService.notifyMember(
+            feedback.memberNo,
+            'Feedback Status Updated',
+            `Your feedback "${feedback.subject}" status has been updated to ${status.replace(/_/g, ' ')}.`
+        );
+
+        return updatedFeedback;
+    }
+
+    async addRemark(id: number, dto: AddFeedbackRemarkDto) {
+        const feedback = await this.prisma.feedback.findUnique({ where: { id } });
+        if (!feedback) throw new NotFoundException('Feedback not found');
+
+        const remark = await this.prisma.feedbackRemark.create({
+            data: {
+                feedbackId: id,
+                adminName: dto.adminName,
+                remark: dto.remark,
+            },
+        });
+
+        // Send notification to member
+        await this.notificationService.notifyMember(
+            feedback.memberNo,
+            'New Remark on Feedback',
+            `A new remark has been added to your feedback "${feedback.subject}" by ${dto.adminName}: ${dto.remark}`
+        );
+
+        return remark;
+    }
+
+    // Categories
+    async findAllCategories() {
+        return this.prisma.feedbackCategory.findMany({
+            orderBy: { name: 'asc' },
+        });
+    }
+
+    async createCategory(dto: CreateFeedbackCategoryDto) {
+        return this.prisma.feedbackCategory.create({
+            data: { name: dto.name },
+        });
+    }
+
+    async deleteCategory(id: number) {
+        return this.prisma.feedbackCategory.delete({
+            where: { id },
+        });
+    }
+
+    // SubCategories
+    async findAllSubCategories() {
+        return this.prisma.feedbackSubCategory.findMany({
+            orderBy: { name: 'asc' },
+        });
+    }
+
+    async createSubCategory(dto: CreateFeedbackSubCategoryDto) {
+        return this.prisma.feedbackSubCategory.create({
+            data: { name: dto.name },
+        });
+    }
+
+    async deleteSubCategory(id: number) {
+        return this.prisma.feedbackSubCategory.delete({
+            where: { id },
+        });
+    }
+
+    async assignCategory(feedbackId: number, categoryId: number | null) {
+        return this.prisma.feedback.update({
+            where: { id: feedbackId },
+            data: { categoryId },
+        });
+    }
+
+    async assignSubCategory(feedbackId: number, subCategoryId: number | null, otherSubCategory?: string) {
+        return this.prisma.feedback.update({
+            where: { id: feedbackId },
+            data: {
+                subCategoryId,
+                otherSubCategory: subCategoryId === null ? otherSubCategory || null : null
+            },
+        });
+    }
+
+    async createFeedback(dto: CreateFeedbackDto, Membership_No: string) {
+        return this.prisma.feedback.create({
+            data: {
+                memberNo: Membership_No,
+                subject: dto.subject,
+                categoryId: dto.categoryId,
+                subCategoryId: dto.subCategoryId,
+                message: dto.message,
+            },
+        });
+    }
+}

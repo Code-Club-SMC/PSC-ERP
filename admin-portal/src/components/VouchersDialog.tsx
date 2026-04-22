@@ -1,0 +1,223 @@
+import React from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, Receipt, Download } from "lucide-react";
+import { Voucher, Booking } from "@/types/room-booking.type";
+import { exportVoucherPDF } from "@/lib/pdfExport";
+import { formatDateTimeForDisplay } from "@/utils/pakDate";
+
+interface VouchersDialogProps {
+  viewVouchers: any;
+  onClose: () => void;
+  vouchers: Voucher[];
+  isLoadingVouchers: boolean;
+}
+
+export const VouchersDialog = React.memo(({
+  viewVouchers,
+  onClose,
+  vouchers,
+  isLoadingVouchers,
+}: VouchersDialogProps) => {
+  const getVoucherBadge = (type: string) => {
+    switch (type) {
+      case "FULL_PAYMENT":
+        return <Badge className="bg-green-100 text-green-800">Full Payment</Badge>;
+      case "HALF_PAYMENT":
+        return <Badge className="bg-blue-100 text-blue-800">Half Payment</Badge>;
+      case "ADVANCE_PAYMENT":
+        return <Badge className="bg-purple-100 text-purple-800">Advance Payment</Badge>;
+      case "REFUND":
+        return <Badge className="bg-orange-100 text-orange-800">Refund</Badge>;
+      case "ADJUSTMENT":
+        return <Badge className="bg-gray-100 text-gray-800">Adjustment</Badge>;
+      default:
+        return <Badge>{type}</Badge>;
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "CONFIRMED":
+        return <Badge className="bg-green-100 text-green-800">Confirmed</Badge>;
+      case "PENDING":
+        return <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>;
+      case "CANCELLED":
+        return <Badge variant="destructive">Cancelled</Badge>;
+      case "EXPIRED":
+        return <Badge variant="outline" className="text-gray-500 border-gray-300">Expired</Badge>;
+      default:
+        return <Badge>{status}</Badge>;
+    }
+  };
+
+  return (
+    <Dialog open={!!viewVouchers} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Payment Vouchers</DialogTitle>
+        </DialogHeader>
+        <div className="py-4">
+          <p className="text-sm text-muted-foreground mb-4">
+            Vouchers for booking #{viewVouchers?.id} - {viewVouchers?.memberName || viewVouchers?.guestName || viewVouchers?.member?.Name}
+          </p>
+
+          {isLoadingVouchers ? (
+            <div className="flex justify-center items-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : vouchers.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Receipt className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No vouchers found for this booking</p>
+            </div>
+          ) : (
+            <div className="space-y-4 max-h-96 overflow-y-auto">
+              {vouchers.map((voucher: Voucher) => (
+                <div key={voucher.id} className="p-4 border rounded-lg bg-muted/50">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        {getVoucherBadge(voucher.voucher_type)}
+                        {(() => {
+                          let status = voucher.status;
+                          if (status === "PENDING" && voucher.payment_mode === "KUICKPAY" && voucher.expiresAt) {
+                            if (new Date(voucher.expiresAt) < new Date()) {
+                              status = "EXPIRED";
+                            }
+                          }
+                          return getStatusBadge(status);
+                        })()}
+                      </div>
+                      <div className="text-sm font-mono text-muted-foreground">
+                        Consumer Number: {voucher.consumer_number}
+                      </div>
+                      {/* {voucher.voucher_no && (
+                        <div className="text-xs font-mono text-muted-foreground">
+                          Voucher No: {voucher.voucher_no}
+                        </div>
+                      )} */}
+                    </div>
+                    <div className="text-right flex flex-col items-end gap-2">
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-primary"
+                          onClick={() => exportVoucherPDF({
+                            ...voucher,
+                            memberName: viewVouchers?.memberName || viewVouchers?.member?.Name,
+                            membershipNo: viewVouchers?.Membership_No || viewVouchers?.member?.Membership_No
+                          })}
+                          title="Download PDF"
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div>
+                        <div className={`text-lg font-bold ${voucher.voucher_type === 'REFUND' || voucher.voucher_type === 'ADJUSTMENT' ? 'text-red-600' : 'text-green-600'}`}>
+                          PKR {parseFloat(voucher.amount.toString()).toLocaleString()}
+                        </div>
+                        <div className="text-xs text-muted-foreground capitalize">
+                          {voucher.payment_mode.toLowerCase() === "check" ? "Cheque" : voucher.payment_mode.toLowerCase()}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
+                    <div>
+                      <div className="font-medium">Booking Type</div>
+                      <div>{voucher.booking_type}</div>
+                    </div>
+                    <div>
+                      <div className="font-medium">Membership No</div>
+                      <div>{voucher.membership_no}</div>
+                    </div>
+                    <div>
+                      <div className="font-medium">Issued By</div>
+                      <div>{voucher.issued_by}</div>
+                    </div>
+                    <div>
+                      <div className="font-medium">Issued At</div>
+                      <div className="text-xs">
+                        {formatDateTimeForDisplay(voucher.issued_at)}
+                      </div>
+                    </div>
+                    {voucher.paid_at && voucher.payment_mode !== "ONLINE" && voucher.payment_mode !== "KUICKPAY" && (
+                      <div>
+                        <div className="font-medium">Paid At</div>
+                        <div className="text-xs">
+                          {formatDateTimeForDisplay(voucher.paid_at)}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Payment Details */}
+                  {(voucher.card_number || voucher.check_number || voucher.bank_name || voucher.transaction_id || (voucher.paid_at && (voucher.payment_mode === "ONLINE" || voucher.payment_mode === "KUICKPAY"))) && (
+                    <div className="mt-3 p-3 bg-blue-50/50 border border-blue-100 rounded-lg text-sm">
+                      <div className="font-semibold text-blue-900 mb-2 flex items-center gap-1.5">
+                        <Receipt className="h-3.5 w-3.5" />
+                        Payment Details
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                        {voucher.card_number && (
+                          <div className="flex justify-between border-b border-blue-100 pb-1">
+                            <span className="text-blue-700 font-medium">Card Number:</span>
+                            <span className="font-mono">{voucher.card_number}</span>
+                          </div>
+                        )}
+                        {voucher.check_number && (
+                          <div className="flex justify-between border-b border-blue-100 pb-1">
+                            <span className="text-blue-700 font-medium">Cheque No:</span>
+                            <span className="font-mono">{voucher.check_number}</span>
+                          </div>
+                        )}
+                        {voucher.bank_name && (
+                          <div className="col-span-2 flex justify-between border-b border-blue-100 pb-1">
+                            <span className="text-blue-700 font-medium">Bank Name:</span>
+                            <span>{voucher.bank_name}</span>
+                          </div>
+                        )}
+                        {voucher.transaction_id && (
+                          <div className="col-span-2 flex justify-between border-b border-blue-100 pb-1">
+                            <span className="text-blue-700 font-medium">Transaction ID:</span>
+                            <span className="font-mono">{voucher.transaction_id}</span>
+                          </div>
+                        )}
+                        {voucher.paid_at && (voucher.payment_mode === "ONLINE" || voucher.payment_mode === "KUICKPAY") && (
+                          <div className="col-span-2 flex justify-between border-b border-blue-100 pb-1">
+                            <span className="text-blue-700 font-medium">Paid Date:</span>
+                            <span>
+                              {formatDateTimeForDisplay(voucher.paid_at)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {voucher.remarks && (
+                    <div className="mt-3 p-2 bg-white border rounded text-sm">
+                      <div className="font-medium">Remarks</div>
+                      <div className="text-muted-foreground">
+                        {voucher.remarks}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button onClick={onClose}>Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+});
+
+VouchersDialog.displayName = "VouchersDialog";
