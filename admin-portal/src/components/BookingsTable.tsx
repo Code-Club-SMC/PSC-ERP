@@ -3,7 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Edit, Receipt, XCircle, Loader2, NotepadText, CheckCircle, Lock } from "lucide-react";
+import { Edit, Receipt, XCircle, Loader2, NotepadText, CheckCircle, Lock, CreditCard } from "lucide-react";
 import { Booking } from "@/types/room-booking.type";
 import { formatDateTimeForDisplay } from "@/utils/pakDate";
 
@@ -13,6 +13,7 @@ interface BookingsTableProps {
   onEdit?: (booking: Booking) => void;
   onDetail: (booking: Booking) => void;
   onViewVouchers: (booking: Booking) => void;
+  onRecordPayment?: (booking: Booking) => void;
   onCancel?: (booking: Booking) => void;
   onClose?: (booking: Booking) => void;
   getPaymentBadge: (status: string) => React.ReactNode;
@@ -27,6 +28,7 @@ export const BookingsTable = React.memo(({
   onEdit,
   onDetail,
   onViewVouchers,
+  onRecordPayment,
   onCancel,
   onClose,
   getPaymentBadge,
@@ -127,6 +129,16 @@ export const BookingsTable = React.memo(({
                     >
                       <Receipt className="h-4 w-4" />
                     </Button>
+                    {onRecordPayment && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onRecordPayment(booking)}
+                        title="Record Payment"
+                      >
+                        <CreditCard className="h-4 w-4" />
+                      </Button>
+                    )}
                     {onCancel && (
                       <Button
                         variant="ghost"

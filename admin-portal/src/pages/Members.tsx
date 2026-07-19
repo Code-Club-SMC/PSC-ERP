@@ -1,3 +1,4 @@
+import { usePermissionAccess } from "@/hooks/use-permissions";
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import {
@@ -55,6 +56,7 @@ import {
 } from "../../config/apis";
 
 export default function Members() {
+  const { canCreate, canUpdate, canDelete } = usePermissionAccess("Members");
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -253,7 +255,7 @@ export default function Members() {
           {/* Bulk Upload */}
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="outline" className="gap-2">
+              <Button rbacAllowed={canCreate} variant="outline" className="gap-2">
                 <Upload className="h-4 w-4" /> Bulk Upload
               </Button>
             </DialogTrigger>
@@ -278,6 +280,7 @@ export default function Members() {
               <DialogFooter>
                 <Button
                   className="w-full"
+                  rbacAllowed={canCreate}
                   onClick={handleBulkUpload}
                   disabled={bulkMutation.isPending}
                 >
@@ -290,7 +293,7 @@ export default function Members() {
           {/* Add Member */}
           <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
             <DialogTrigger asChild>
-              <Button className="gap-2">
+              <Button rbacAllowed={canCreate} className="gap-2">
                 <Plus className="h-4 w-4" /> Add Member
               </Button>
             </DialogTrigger>
@@ -304,6 +307,7 @@ export default function Members() {
                 className="grid grid-cols-2 gap-4 py-4"
                 onSubmit={(e) => {
                   e.preventDefault();
+                  if (!canCreate) return;
                   const formData = new FormData(e.currentTarget);
                   const data = Object.fromEntries(formData.entries());
                   createMutation.mutate(data);
@@ -395,7 +399,9 @@ export default function Members() {
                   >
                     Cancel
                   </Button>
-                  <Button type="submit">Create Member</Button>
+                  <Button type="submit" rbacAllowed={canCreate}>
+                    Create Member
+                  </Button>
                 </div>
               </form>
             </DialogContent>
@@ -414,6 +420,7 @@ export default function Members() {
                   className="grid grid-cols-2 gap-4 py-4"
                   onSubmit={(e) => {
                     e.preventDefault();
+                    if (!canUpdate) return;
                     const formData = new FormData(e.currentTarget);
                     const updates = Object.fromEntries(formData.entries());
                     updateMutation.mutate({
@@ -569,7 +576,7 @@ export default function Members() {
                     >
                       Cancel
                     </Button>
-                    <Button type="submit">
+                    <Button type="submit" rbacAllowed={canUpdate}>
                       {updateMutation.isPending ? "Updating..." : "Update"}
                     </Button>
                   </div>
@@ -603,6 +610,7 @@ export default function Members() {
             </Button>
             <Button
               variant="destructive"
+              rbacAllowed={canDelete}
               onClick={handleDeleteMember}
               disabled={deleteMutation.isPending}
             >
@@ -864,6 +872,7 @@ export default function Members() {
                           <Button
                             variant="ghost"
                             size="icon"
+                            rbacAllowed={canUpdate}
                             onClick={() => setEditMember(member)}
                           >
                             <Edit className="h-4 w-4" />
@@ -871,6 +880,7 @@ export default function Members() {
                           <Button
                             variant="ghost"
                             size="icon"
+                            rbacAllowed={canDelete}
                             onClick={() => setDeleteMemberDialog(member)}
                           >
                             <Trash2 className="h-4 w-4" />

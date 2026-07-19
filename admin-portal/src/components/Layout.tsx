@@ -35,28 +35,31 @@ export function Layout() {
     <SidebarProvider>
       <div className="min-h-screen flex w-full overflow-hidden">
         <AppSidebar />
-        <main className="flex-1 flex flex-col min-w-0">
-          <header className="h-14 border-b bg-card flex items-center justify-between px-4 sticky top-0 z-10 shrink-0">
-            <div className="flex items-center">
-              <SidebarTrigger className="mr-4" />
-              <h1 className="text-xl font-bold text-foreground">
+        <main id="main-content" className="flex-1 flex flex-col min-w-0">
+          <header className="h-12 border-b bg-card flex items-center justify-between px-3 sticky top-0 z-10 shrink-0">
+            <div className="flex items-center gap-2">
+              <SidebarTrigger className="h-7 w-7" />
+              <h1 className="text-[1.0769rem] font-semibold text-foreground">
                 Admin Portal
               </h1>
             </div>
-            <div className="flex items-center gap-x-2">
+            <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
                 size="icon"
+                className="h-[28px] w-[28px]"
+                aria-label="Toggle theme"
                 onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
               >
-                <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-                <span className="sr-only">Toggle theme</span>
+                <Sun className="h-3.5 w-3.5 rotate-0 scale-100 transition-transform dark:-rotate-90 dark:scale-0" />
+                <Moon className="absolute h-3.5 w-3.5 rotate-90 scale-0 transition-transform dark:rotate-0 dark:scale-100" />
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => mutate()}><LogOut /></Button>
+              <Button variant="ghost" size="icon" className="h-[28px] w-[28px]" aria-label="Sign out" onClick={() => mutate()}>
+                <LogOut className="h-3.5 w-3.5" />
+              </Button>
             </div>
           </header>
-          <div className="flex-1 p-4 sm:p-6 bg-background overflow-auto">
+          <div className="flex-1 p-4 bg-background overflow-auto">
             <div className="max-w-[100vw]">
               <Outlet />
             </div>

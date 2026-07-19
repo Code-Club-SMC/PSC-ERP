@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import type { AffiliatedClub } from "@/types/affiliated-club.type";
 
 interface EditBookingDialogProps {
+  open?: boolean;
   editBooking: Booking | null;
   editForm: BookingForm;
   onEditFormChange: (field: keyof BookingForm, value: any) => void;
@@ -30,9 +31,12 @@ interface EditBookingDialogProps {
   affMembershipNo?: string;
   setAffMembershipNo?: (no: string) => void;
   clubs?: AffiliatedClub[];
+  showPaymentSection?: boolean;
+  onOpenPaymentDialog?: () => void;
 }
 
 export const EditBookingDialog = React.memo(({
+  open,
   editBooking,
   editForm,
   onEditFormChange,
@@ -51,9 +55,11 @@ export const EditBookingDialog = React.memo(({
   affMembershipNo,
   setAffMembershipNo,
   clubs = [],
+  showPaymentSection = true,
+  onOpenPaymentDialog,
 }: EditBookingDialogProps) => {
   return (
-    <Dialog open={!!editBooking} onOpenChange={onClose}>
+    <Dialog open={open ?? !!editBooking} onOpenChange={onClose}>
       <DialogContent className="max-w-[80vw] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Room Booking</DialogTitle>
@@ -179,6 +185,8 @@ export const EditBookingDialog = React.memo(({
           selectedRoomIds={selectedRoomIds}
           onRoomSelection={onRoomSelection ? (id) => onRoomSelection(id, true) : undefined}
           isAffiliated={isAffiliated}
+          showPaymentSection={showPaymentSection}
+          onOpenPaymentDialog={onOpenPaymentDialog}
         />
 
         <DialogFooter>

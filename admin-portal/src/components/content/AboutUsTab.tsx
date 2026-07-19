@@ -1,3 +1,4 @@
+import { usePermissionAccess } from "@/hooks/use-permissions";
 
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -33,6 +34,7 @@ const quillFormats = [
 ];
 
 export default function AboutUsTab() {
+    const { canCreate, canUpdate, canDelete } = usePermissionAccess("Contents");
     const [clubInfo, setClubInfo] = useState("");
     const [aboutUsId, setAboutUsId] = useState<number | null>(null);
     const { toast } = useToast();
@@ -136,7 +138,7 @@ export default function AboutUsTab() {
                             formats={quillFormats}
                         />
                     </div>
-                    <Button onClick={handleSaveInfo} disabled={upsertAboutUsMutation.isPending}>
+                    <Button rbacAllowed={aboutUsId ? canUpdate : canCreate} onClick={handleSaveInfo} disabled={upsertAboutUsMutation.isPending}>
                         {upsertAboutUsMutation.isPending ? "Saving..." : "Save Club Info"}
                     </Button>
 
@@ -191,8 +193,8 @@ export default function AboutUsTab() {
                                 <div className="p-4 flex-1 flex flex-col justify-between">
                                     <div className="text-sm prose max-w-none" dangerouslySetInnerHTML={{ __html: item.description }} />
                                     <div className="flex justify-end gap-2 mt-2">
-                                        <Button variant="ghost" size="icon" onClick={() => setEditHistory(item)}><Edit className="h-4 w-4" /></Button>
-                                        <Button variant="ghost" size="icon" onClick={() => setDeleteHistoryData(item)}><Trash2 className="h-4 w-4" /></Button>
+                                        <Button rbacAllowed={canUpdate} variant="ghost" size="icon" onClick={() => setEditHistory(item)}><Edit className="h-4 w-4" /></Button>
+                                        <Button rbacAllowed={canDelete} variant="ghost" size="icon" onClick={() => setDeleteHistoryData(item)}><Trash2 className="h-4 w-4" /></Button>
                                     </div>
                                 </div>
                             </div>
@@ -233,7 +235,7 @@ export default function AboutUsTab() {
                     <p>Are you sure?</p>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setDeleteHistoryData(null)} disabled={deleteHistoryMutation.isPending}>Cancel</Button>
-                        <Button variant="destructive" onClick={() => deleteHistoryMutation.mutate(deleteHistoryData.id)} disabled={deleteHistoryMutation.isPending}>
+                        <Button rbacAllowed={canDelete} variant="destructive" onClick={() => deleteHistoryMutation.mutate(deleteHistoryData.id)} disabled={deleteHistoryMutation.isPending}>
                             {deleteHistoryMutation.isPending ? "Deleting..." : "Delete"}
                         </Button>
                     </DialogFooter>

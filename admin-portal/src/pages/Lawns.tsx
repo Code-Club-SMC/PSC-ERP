@@ -1,3 +1,4 @@
+import { usePermissionAccess } from "@/hooks/use-permissions";
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -824,6 +825,7 @@ const LawnDetailDialog = ({
 };
 
 export default function Lawns() {
+  const { canCreate, canUpdate, canDelete } = usePermissionAccess("Lawns");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -1000,10 +1002,10 @@ export default function Lawns() {
               </SelectContent>
             </Select>
           </div>
-          <Button variant="outline" className="gap-2 border-orange-200 bg-orange-50 text-orange-700" onClick={() => setReserveDialog(true)}>
+          <Button variant="outline" className="gap-2 border-orange-200 bg-orange-50 text-orange-700" rbacAllowed={canUpdate} onClick={() => setReserveDialog(true)}>
             <CalendarIcon className="h-4 w-4" /> Reservations
           </Button>
-          <Button onClick={() => {
+          <Button rbacAllowed={canCreate} onClick={() => {
             const maxOrder = lawns.reduce((max: number, l: any) => Math.max(max, Number(l.order || 0)), 0);
             setForm({ ...initialFormState, order: (maxOrder + 1).toString() });
             setIsAddOpen(true);
@@ -1076,6 +1078,7 @@ export default function Lawns() {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 text-blue-600"
+                          rbacAllowed={canUpdate}
                           onClick={() => setEditLawn(l)}
                         >
                           <Edit className="h-4 w-4" />
@@ -1084,6 +1087,7 @@ export default function Lawns() {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 text-destructive"
+                          rbacAllowed={canDelete}
                           onClick={() => setDeleteLawnItem(l)}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -1338,9 +1342,9 @@ export default function Lawns() {
                 );
               })()}
             </div>
-            <Button variant="outline" onClick={() => setReserveDialog(false)}>Close</Button>
+            <Button variant="outline" rbacAllowed={canUpdate} onClick={() => setReserveDialog(false)}>Close</Button>
             <Button
-              onClick={handleBulkReserve}
+              rbacAllowed={canUpdate} onClick={handleBulkReserve}
               disabled={(() => {
                 if (reserveMutation.isPending) return true;
                 if (reserveDates.from && reserveDates.to && getDaySortKey(reserveDates.from) > getDaySortKey(reserveDates.to)) return true;
@@ -1444,7 +1448,13 @@ export default function Lawns() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddOpen(false)}>Cancel</Button>
-            <Button onClick={() => createMutation.mutate(form)}>Create</Button>
+            <Button
+              rbacAllowed={canCreate}
+              onClick={() => createMutation.mutate(form)}
+              disabled={createMutation.isPending}
+            >
+              Create
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1533,7 +1543,13 @@ export default function Lawns() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditLawn(null)}>Cancel</Button>
-            <Button onClick={() => updateMutation.mutate(editForm)}>Save</Button>
+            <Button
+              rbacAllowed={canUpdate}
+              onClick={() => updateMutation.mutate(editForm)}
+              disabled={updateMutation.isPending}
+            >
+              Save
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1545,7 +1561,14 @@ export default function Lawns() {
           <div className="py-4 text-muted-foreground">Are you sure you want to delete this lawn? This action cannot be undone.</div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteLawnItem(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={() => deleteMutation.mutate(deleteLawnItem.id)}>Delete</Button>
+            <Button
+              variant="destructive"
+              rbacAllowed={canDelete}
+              onClick={() => deleteMutation.mutate(deleteLawnItem.id)}
+              disabled={deleteMutation.isPending}
+            >
+              Delete
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

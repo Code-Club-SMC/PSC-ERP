@@ -1,4 +1,4 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, ForbiddenException, NotFoundException } from '@nestjs/common';
 import * as admin from 'firebase-admin';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -423,7 +423,26 @@ export class NotificationService {
     });
   }
 
-  async updateSeen(notiID: number) {
+  async updateSeen(notiID: number, membershipNo: string) {
+    const delivery = await this.prisma.deliveredNotis.findUnique({
+      where: { id: notiID },
+      select: { id: true, member: true, seen: true },
+    });
+
+    if (!delivery) {
+      throw new NotFoundException('Notification delivery not found');
+    }
+
+    if (delivery.member !== membershipNo) {
+      throw new ForbiddenException(
+        'You can only mark your own notification deliveries as seen',
+      );
+    }
+
+    if (delivery.seen) {
+      return delivery;
+    }
+
     return await this.prisma.deliveredNotis.update({
       where: {
         id: notiID,

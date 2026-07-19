@@ -1,3 +1,4 @@
+import { usePermissionAccess } from "@/hooks/use-permissions";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,7 @@ import {
 } from "../../config/apis";
 
 export default function LawnCategories() {
+  const { canCreate, canUpdate, canDelete } = usePermissionAccess("Lawn Categories");
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newCat, setNewCat] = useState("");
   const [newOrder, setNewOrder] = useState("0")
@@ -178,7 +180,7 @@ export default function LawnCategories() {
           }
         }}>
           <DialogTrigger asChild>
-            <Button className="gap-2">
+            <Button rbacAllowed={canCreate} className="gap-2">
               <Plus className="h-4 w-4" />
               Add Category
             </Button>
@@ -306,6 +308,7 @@ export default function LawnCategories() {
                       <Button
                         variant="ghost"
                         size="icon"
+                        rbacAllowed={canUpdate}
                         onClick={() => {
                           setEditCategory(category);
                         }}
@@ -316,6 +319,7 @@ export default function LawnCategories() {
                       <Button
                         variant="ghost"
                         size="icon"
+                        rbacAllowed={canDelete}
                         onClick={() => setDeleteCategory(category)}
                       >
                         <Trash2 className="h-4 w-4" />

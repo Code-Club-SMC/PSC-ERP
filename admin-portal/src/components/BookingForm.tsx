@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "./ui/input";
+import { BookingPaymentSummaryCard } from "./BookingPaymentSummaryCard";
 
 interface BookingFormProps {
   form: BookingForm;
@@ -40,6 +41,8 @@ interface BookingFormProps {
   selectedRoomIds?: string[];
   onRoomSelection?: (roomId: string) => void;
   isAffiliated?: boolean;
+  showPaymentSection?: boolean;
+  onOpenPaymentDialog?: () => void;
 }
 
 export const BookingFormComponent = React.memo(({
@@ -65,6 +68,8 @@ export const BookingFormComponent = React.memo(({
   selectedRoomIds,
   onRoomSelection,
   isAffiliated = false,
+  showPaymentSection = true,
+  onOpenPaymentDialog,
 }: BookingFormProps) => {
 
   const [localSelectedHead, setLocalSelectedHead] = React.useState<string>("");
@@ -502,13 +507,25 @@ export const BookingFormComponent = React.memo(({
 
       {/* Row 7: Payment */}
       <div className="col-span-12 border-t pt-4">
-        <PaymentSection
-          form={form}
-          onChange={onChange}
-          isEdit={isEdit}
-          roomCount={selectedRoomIds?.length || (form.roomId ? 1 : 0)}
-          isAffiliated={isAffiliated}
-        />
+        {showPaymentSection ? (
+          <PaymentSection
+            form={form}
+            onChange={onChange}
+            isEdit={isEdit}
+            roomCount={selectedRoomIds?.length || (form.roomId ? 1 : 0)}
+            isAffiliated={isAffiliated}
+          />
+        ) : (
+          <BookingPaymentSummaryCard
+            paymentStatus={form.paymentStatus}
+            paidAmount={Number(form.paidAmount) || 0}
+            pendingAmount={Number(form.pendingAmount) || 0}
+            paymentMode={form.paymentMode}
+            transactionId={form.transaction_id}
+            onRecordPayment={() => onOpenPaymentDialog?.()}
+            disabled={!onOpenPaymentDialog}
+          />
+        )}
       </div>
 
     </div>

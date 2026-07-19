@@ -6,6 +6,11 @@ import { LoginAdminDto } from './dtos/login-admin.dto';
 import { JwtService } from '@nestjs/jwt';
 import { MailerService } from 'src/mailer/mailer.service';
 import { randomUUID } from 'crypto';
+import { RolesEnum } from 'src/common/constants/roles.enum';
+import {
+  isValidPermissionPayload,
+  normalizePermissionMatrix,
+} from 'src/common/utils/permissions';
 
 @Injectable()
 export class AuthService {
@@ -21,15 +26,22 @@ export class AuthService {
     email: string;
     role?: string;
     status?: string;
-    permissions?: any[];
+    permissions?: any;
     FCMToken?: string;
     sessionToken?: string;
   }) {
-    const accessToken = await this.jwtService.signAsync(payload, {
+    const tokenPayload =
+      payload.permissions === undefined
+        ? payload
+        : {
+            ...payload,
+            permissions: normalizePermissionMatrix(payload.permissions),
+          };
+    const accessToken = await this.jwtService.signAsync(tokenPayload, {
       secret: process.env.JWT_ACCESS_SECRET!,
       expiresIn: '1d',
     });
-    const refresh_token = await this.jwtService.signAsync(payload, {
+    const refresh_token = await this.jwtService.signAsync(tokenPayload, {
       secret: process.env.JWT_REFRESH_SECRET!,
       expiresIn: '7d',
     });
@@ -42,7 +54,7 @@ export class AuthService {
     email: string;
     role?: string;
     status?: string;
-    permissions?: any[];
+    permissions?: any;
     FCMToken?: string;
     sessionToken?: string;
   }) {
@@ -53,6 +65,16 @@ export class AuthService {
 
   async createSuperAdmin(payload: CreateAdminDto) {
     const { name, email, password } = payload;
+    const existingSuperAdmin = await this.prisma.admin.count({
+      where: { role: RolesEnum.SUPER_ADMIN },
+    });
+    if (existingSuperAdmin > 0) {
+      throw new HttpException(
+        'Super admin already exists. Use /auth/create/admin from an authorized super admin account.',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
     // check if email exists
     const existingAdmin = await this.prisma.admin.findUnique({
       where: { email: email },
@@ -76,16 +98,29 @@ export class AuthService {
     });
   }
 
-  async removeAdmin(adminID: number) {
+  async removeAdmin(adminID: number, removedByRole?: string) {
     const existingAdmin = await this.prisma.admin.findUnique({
       where: { id: adminID },
     });
     if (!existingAdmin) {
       throw new HttpException('Admin not found', HttpStatus.BAD_REQUEST);
     }
+    if (
+      existingAdmin.role === RolesEnum.SUPER_ADMIN &&
+      removedByRole !== RolesEnum.SUPER_ADMIN
+    ) {
+      throw new HttpException(
+        'Only SUPER_ADMIN can remove a SUPER_ADMIN account',
+        HttpStatus.FORBIDDEN,
+      );
+    }
     return this.prisma.admin.delete({ where: { id: adminID } });
   }
-  async createAdmin(payload: CreateAdminDto, createdBy: string) {
+  async createAdmin(
+    payload: CreateAdminDto,
+    createdBy: string,
+    createdByRole?: string,
+  ) {
     const { name, email, password } = payload;
     const existingAdmin = await this.prisma.admin.findUnique({
       where: { email: email },
@@ -97,23 +132,50 @@ export class AuthService {
       );
     }
 
+    const targetRole = payload.role || RolesEnum.ADMIN;
+    if (
+      String(targetRole) === RolesEnum.SUPER_ADMIN &&
+      createdByRole !== RolesEnum.SUPER_ADMIN
+    ) {
+      throw new HttpException(
+        'Only SUPER_ADMIN can create another SUPER_ADMIN',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
     // hash pass
     const hashedPass = await bcrypt.hash(password, 10);
+    const data: any = {
+      name,
+      password: hashedPass,
+      email,
+      role: targetRole,
+      createdBy,
+    };
+
+    if (Object.prototype.hasOwnProperty.call(payload, 'permissions')) {
+      const permissions = (payload as any).permissions;
+      if (!isValidPermissionPayload(permissions)) {
+        throw new HttpException(
+          'Invalid permissions payload',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      data.permissions = permissions;
+    }
+
     return this.prisma.admin.create({
       data: {
-        name,
-        password: hashedPass,
-        email,
-        role: 'ADMIN',
-        createdBy: createdBy,
+        ...data,
       },
     });
   }
 
   async updateAdmin(
     adminID: number,
-    payload: Partial<CreateAdminDto> & { updates?: { permissions?: string[] } },
+    payload: Partial<CreateAdminDto> & { updates?: { permissions?: any } },
     updatedBy: string,
+    updatedByRole?: string,
   ) {
     const admin = await this.prisma.admin.findUnique({
       where: { id: adminID },
@@ -121,6 +183,26 @@ export class AuthService {
 
     if (!admin) {
       throw new HttpException('Admin not found', HttpStatus.NOT_FOUND);
+    }
+
+    if (
+      admin.role === RolesEnum.SUPER_ADMIN &&
+      updatedByRole !== RolesEnum.SUPER_ADMIN
+    ) {
+      throw new HttpException(
+        'Only SUPER_ADMIN can update a SUPER_ADMIN account',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    if (
+      String(payload.role) === RolesEnum.SUPER_ADMIN &&
+      updatedByRole !== RolesEnum.SUPER_ADMIN
+    ) {
+      throw new HttpException(
+        'Only SUPER_ADMIN can assign the SUPER_ADMIN role',
+        HttpStatus.FORBIDDEN,
+      );
     }
 
     const updateData: any = {
@@ -132,11 +214,14 @@ export class AuthService {
       updateData.password = await bcrypt.hash(payload.password, 10);
     }
 
-    // Update permissions if provided in payload.updates
-    if (payload.updates?.permissions) {
-      if (!Array.isArray(payload.updates.permissions)) {
+    // Update permissions only when explicitly included by the caller.
+    if (
+      payload.updates &&
+      Object.prototype.hasOwnProperty.call(payload.updates, 'permissions')
+    ) {
+      if (!isValidPermissionPayload(payload.updates.permissions)) {
         throw new HttpException(
-          'Permissions must be an array',
+          'Invalid permissions payload',
           HttpStatus.BAD_REQUEST,
         );
       }
@@ -145,7 +230,7 @@ export class AuthService {
 
     // Copy over other fields (name, email, role, etc.)
     Object.keys(payload).forEach((key) => {
-      if (key !== 'password' && key !== 'updates') {
+      if (key !== 'password' && key !== 'updates' && key !== 'permissions') {
         updateData[key] = payload[key];
       }
     });

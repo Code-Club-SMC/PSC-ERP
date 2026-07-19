@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   HttpException,
   HttpStatus,
   Injectable,
@@ -6612,7 +6613,63 @@ export class BookingService {
     }
   }
 
-  async cancelUnpaidBooking(consumer_number: string) {
+  async assertBookingOwnership(
+    bookingFor: string,
+    bookingId: number,
+    requesterMembershipNo: string,
+  ) {
+    if (!requesterMembershipNo) {
+      throw new ForbiddenException('Unauthorized access');
+    }
+
+    if (!bookingId || Number.isNaN(Number(bookingId))) {
+      throw new BadRequestException('Invalid booking id');
+    }
+
+    let ownsBooking = false;
+    if (bookingFor === 'rooms') {
+      const booking = await this.prismaService.roomBooking.findUnique({
+        where: { id: bookingId },
+        select: { Membership_No: true },
+      });
+      ownsBooking = booking?.Membership_No === requesterMembershipNo;
+    } else if (bookingFor === 'room_aff') {
+      const booking = await this.prismaService.affClubBooking.findUnique({
+        where: { id: bookingId },
+        select: { affiliatedMembershipNo: true },
+      });
+      ownsBooking = booking?.affiliatedMembershipNo === requesterMembershipNo;
+    } else if (bookingFor === 'halls') {
+      const booking = await this.prismaService.hallBooking.findUnique({
+        where: { id: bookingId },
+        include: { member: { select: { Membership_No: true } } },
+      });
+      ownsBooking = booking?.member?.Membership_No === requesterMembershipNo;
+    } else if (bookingFor === 'lawns') {
+      const booking = await this.prismaService.lawnBooking.findUnique({
+        where: { id: bookingId },
+        include: { member: { select: { Membership_No: true } } },
+      });
+      ownsBooking = booking?.member?.Membership_No === requesterMembershipNo;
+    } else if (bookingFor === 'photoshoots') {
+      const booking = await this.prismaService.photoshootBooking.findUnique({
+        where: { id: bookingId },
+        include: { member: { select: { Membership_No: true } } },
+      });
+      ownsBooking = booking?.member?.Membership_No === requesterMembershipNo;
+    }
+
+    if (!ownsBooking) {
+      throw new ForbiddenException(
+        'You can only request cancellation for your own booking',
+      );
+    }
+  }
+
+  async cancelUnpaidBooking(
+    consumer_number: string,
+    requesterMembershipNo?: string,
+  ) {
     console.log(consumer_number)
     const voucher = await this.prismaService.paymentVoucher.findUnique({
       where: { consumer_number: consumer_number },
@@ -6620,6 +6677,15 @@ export class BookingService {
 
     if (!voucher) {
       throw new NotFoundException('Voucher not found');
+    }
+
+    if (
+      requesterMembershipNo &&
+      voucher.membership_no !== requesterMembershipNo
+    ) {
+      throw new ForbiddenException(
+        'You can only cancel your own unpaid vouchers',
+      );
     }
 
     if (voucher.status !== VoucherStatus.PENDING) {
@@ -6727,7 +6793,7 @@ export class BookingService {
 
     // Sort by createdAt descending to get the latest
     const requests = [...booking.cancellationRequests].sort((a, b) =>
-      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
 
     // Prefer PENDING request if exists

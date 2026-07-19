@@ -26,6 +26,7 @@ import {
   getCancellationRequests,
   getClosedBookings,
   closeBooking,
+  userWho,
 } from "../../config/apis";
 import { Plus, Loader2, X } from "lucide-react";
 import {
@@ -62,6 +63,8 @@ import { VouchersDialog } from "@/components/VouchersDialog";
 import { CancelBookingDialog } from "@/components/CancelBookingDialog";
 import { CloseBookingDialog } from "@/components/CloseBookingDialog";
 import { BookingFormComponent } from "@/components/BookingForm";
+import { PaymentSection } from "@/components/PaymentSection";
+import { BookingPaymentDialog } from "@/components/BookingPaymentDialog";
 
 // Import reusable components
 import { BookingsTable } from "@/components/BookingsTable";
@@ -84,6 +87,7 @@ import {
 import { parseLocalDate } from "@/utils/hallBookingUtils";
 import { format, startOfDay, addYears } from "date-fns";
 import { BookingDetailsCard } from "@/components/details/RoomBookingDets";
+import { hasModuleAction } from "@/utils/permissions";
 
 // ShadCN components for inlined form
 import { Checkbox } from "@/components/ui/checkbox";
@@ -92,6 +96,9 @@ import { Input } from "@/components/ui/input";
 
 export default function RoomBookings() {
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [createPaymentDialogOpen, setCreatePaymentDialogOpen] = useState(false);
+  const [editPaymentDialogOpen, setEditPaymentDialogOpen] = useState(false);
   const [editBooking, setEditBooking] = useState<Booking | null>(null);
   const [cancelBooking, setCancelBooking] = useState<Booking | null>(null);
   const [closeBookingTarget, setCloseBookingTarget] = useState<Booking | null>(null);
@@ -121,6 +128,20 @@ export default function RoomBookings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const location = useLocation();
+  const { data: currentUser } = useQuery({
+    queryKey: ["currentUser"],
+    queryFn: userWho,
+  });
+  const isSuperAdmin = currentUser?.role === "SUPER_ADMIN";
+  const canCreateRoomBookings =
+    isSuperAdmin ||
+    hasModuleAction(currentUser?.permissions, "Room Bookings", "create");
+  const canUpdateRoomBookings =
+    isSuperAdmin ||
+    hasModuleAction(currentUser?.permissions, "Room Bookings", "update");
+  const canDeleteRoomBookings =
+    isSuperAdmin ||
+    hasModuleAction(currentUser?.permissions, "Room Bookings", "delete");
 
   // Handle conversion from Reservation
   useEffect(() => {
@@ -477,6 +498,8 @@ export default function RoomBookings() {
     onSuccess: () => {
       toast({ title: "Booking updated successfully" });
       queryClient.invalidateQueries({ queryKey: ["bookings"] });
+      setIsEditDialogOpen(false);
+      setEditPaymentDialogOpen(false);
       setEditBooking(null);
     },
     onError: (error: any) => {
@@ -970,6 +993,7 @@ export default function RoomBookings() {
   };
 
   const handleCreate = () => {
+    if (!canCreateRoomBookings) return;
     if (
       !form.membershipNo ||
       !form.roomTypeId ||
@@ -1059,6 +1083,7 @@ export default function RoomBookings() {
   };
 
   const handleUpdate = () => {
+    if (!canUpdateRoomBookings) return;
     if (
       !editForm.membershipNo ||
       !editForm.roomTypeId ||
@@ -1083,41 +1108,73 @@ export default function RoomBookings() {
       return;
     }
 
-    const payload = {
-      id: editBooking?.id?.toString(),
-      category: "Room",
-      membershipNo: editForm.membershipNo,
-      subCategoryId: editForm.roomTypeId,
-      entityId: editSelectedRoomIds[0],
-      selectedRoomIds: editSelectedRoomIds,
-      pricingType: editForm.pricingType,
-      checkIn: editForm.checkIn.split("T")[0],
-      checkOut: editForm.checkOut.split("T")[0],
-      totalPrice: editForm.totalPrice.toString(),
-      paymentStatus: editForm.paymentStatus || editBooking?.paymentStatus || "UNPAID",
-      paidAmount: editForm.paidAmount,
-      pendingAmount: editForm.pendingAmount,
-      paymentMode: editForm.paymentMode,
-      prevRoomId: editBooking?.roomId?.toString(),
-      paidBy: editForm.paidBy,
-      guestContact: editForm.guestContact,
-      guestName: editForm.guestName,
-      guestCNIC: editForm.guestCNIC,
-      numberOfAdults: editForm.numberOfAdults,
-      numberOfChildren: editForm.numberOfChildren,
-      specialRequests: editForm.specialRequests,
-      remarks: editForm.remarks,
-      heads: editForm.heads,
-      card_number: editForm.card_number,
-      check_number: editForm.check_number,
-      bank_name: editForm.bank_name,
-      transaction_id: editForm.transaction_id,
-      paid_at: editForm.paid_at,
-      generateAdvanceVoucher: editForm.generateAdvanceVoucher || false,
-      advanceVoucherAmount: editForm.advanceVoucherAmount || 0,
-    };
+    const payload = buildRoomUpdatePayload();
 
     updateMutation.mutate(payload);
+  };
+
+  const buildRoomUpdatePayload = (
+    sourceForm: BookingForm = editForm,
+    sourceBooking: Booking | null = editBooking,
+    sourceRoomIds: string[] = editSelectedRoomIds
+  ) => {
+    return {
+      id: sourceBooking?.id?.toString(),
+      category: "Room",
+      membershipNo: sourceForm.membershipNo,
+      subCategoryId: sourceForm.roomTypeId,
+      entityId: sourceRoomIds[0],
+      selectedRoomIds: sourceRoomIds,
+      pricingType: sourceForm.pricingType,
+      checkIn: sourceForm.checkIn.split("T")[0],
+      checkOut: sourceForm.checkOut.split("T")[0],
+      totalPrice: sourceForm.totalPrice.toString(),
+      paymentStatus: sourceForm.paymentStatus || sourceBooking?.paymentStatus || "UNPAID",
+      paidAmount: sourceForm.paidAmount,
+      pendingAmount: sourceForm.pendingAmount,
+      paymentMode: sourceForm.paymentMode,
+      prevRoomId: sourceBooking?.roomId?.toString(),
+      paidBy: sourceForm.paidBy,
+      guestContact: sourceForm.guestContact,
+      guestName: sourceForm.guestName,
+      guestCNIC: sourceForm.guestCNIC,
+      numberOfAdults: sourceForm.numberOfAdults,
+      numberOfChildren: sourceForm.numberOfChildren,
+      specialRequests: sourceForm.specialRequests,
+      remarks: sourceForm.remarks,
+      heads: sourceForm.heads,
+      card_number: sourceForm.card_number,
+      check_number: sourceForm.check_number,
+      bank_name: sourceForm.bank_name,
+      transaction_id: sourceForm.transaction_id,
+      paid_at: sourceForm.paid_at,
+      generateAdvanceVoucher: sourceForm.generateAdvanceVoucher || false,
+      advanceVoucherAmount: sourceForm.advanceVoucherAmount || 0,
+    };
+  };
+
+  const handleSaveEditPayment = () => {
+    if (!editBooking) return;
+    if (!editForm.membershipNo || editSelectedRoomIds.length === 0) {
+      toast({
+        title: "Booking details are not ready yet",
+        description: "Please try again in a moment",
+        variant: "destructive",
+      });
+      return;
+    }
+    const payload = buildRoomUpdatePayload();
+    updateMutation.mutate(payload);
+  };
+
+  const openEditDialog = (booking: Booking) => {
+    setEditBooking(booking);
+    setIsEditDialogOpen(true);
+  };
+
+  const openEditPaymentDialog = (booking: Booking) => {
+    setEditBooking(booking);
+    setEditPaymentDialogOpen(true);
   };
 
   const handleDelete = (reason: string) => {
@@ -1163,6 +1220,8 @@ export default function RoomBookings() {
   };
 
   const resetEditForm = () => {
+    setIsEditDialogOpen(false);
+    setEditPaymentDialogOpen(false);
     setEditForm(initialFormState);
     setEditAvailableRooms([]);
     setEditBooking(null);
@@ -1216,7 +1275,7 @@ export default function RoomBookings() {
             }}
           >
             <DialogTrigger asChild>
-              <Button className="gap-2">
+              <Button className="gap-2" rbacAllowed={canCreateRoomBookings}>
                 <Plus className="h-4 w-4" />
                 New Booking
               </Button>
@@ -1245,11 +1304,23 @@ export default function RoomBookings() {
                 isEdit={false}
                 selectedRoomIds={selectedRoomIds}
                 onRoomSelection={(roomId) => handleRoomSelection(roomId, false)}
+                showPaymentSection={false}
+                onOpenPaymentDialog={
+                  canCreateRoomBookings ? () => setCreatePaymentDialogOpen(true) : undefined
+                }
               />
 
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsAddOpen(false)}>Cancel</Button>
-                <Button onClick={handleCreate} disabled={createMutation.isPending || !selectedMember}>
+                <Button
+                  rbacAllowed={canCreateRoomBookings}
+                  onClick={handleCreate}
+                  disabled={
+                    !canCreateRoomBookings ||
+                    createMutation.isPending ||
+                    !selectedMember
+                  }
+                >
                   {createMutation.isPending ? "Creating..." : "Create Booking"}
                 </Button>
               </DialogFooter>
@@ -1277,14 +1348,15 @@ export default function RoomBookings() {
             <BookingsTable
             bookings={filteredBookings}
             isLoading={isLoading}
-            onEdit={setEditBooking}
+            onEdit={canUpdateRoomBookings ? openEditDialog : undefined}
             onDetail={(booking: Booking) => {
               setOpenDetails(true);
               setDetailBooking(booking);
             }}
             onViewVouchers={handleViewVouchers}
-            onCancel={setCancelBooking}
-            onClose={setCloseBookingTarget}
+            onRecordPayment={canUpdateRoomBookings ? openEditPaymentDialog : undefined}
+            onCancel={canDeleteRoomBookings ? setCancelBooking : undefined}
+            onClose={canUpdateRoomBookings ? setCloseBookingTarget : undefined}
             getPaymentBadge={getPaymentBadge}
           />
           </TabsContent>
@@ -1293,7 +1365,7 @@ export default function RoomBookings() {
           <BookingsTable
             bookings={filteredBookings}
             isLoading={isLoading}
-            onEdit={setEditBooking}
+            onEdit={canUpdateRoomBookings ? openEditDialog : undefined}
             onDetail={(booking: Booking) => {
               setOpenDetails(true);
               setDetailBooking(booking);
@@ -1307,15 +1379,15 @@ export default function RoomBookings() {
           <BookingsTable
             bookings={filteredBookings}
             isLoading={isLoading}
-            onEdit={setEditBooking}
+            onEdit={canUpdateRoomBookings ? openEditDialog : undefined}
             onDetail={(booking: Booking) => {
               setOpenDetails(true);
               setDetailBooking(booking);
             }}
             onViewVouchers={handleViewVouchers}
             getPaymentBadge={getPaymentBadge}
-            onApprove={handleApproveReq}
-            onReject={handleRejectReq}
+            onApprove={canUpdateRoomBookings ? handleApproveReq : undefined}
+            onReject={canUpdateRoomBookings ? handleRejectReq : undefined}
             onViewReason={handleViewReason}
           />
         </TabsContent>
@@ -1343,6 +1415,7 @@ export default function RoomBookings() {
       </div>
 
       <EditBookingDialog
+        open={isEditDialogOpen && !!editBooking}
         editBooking={editBooking}
         editForm={editForm}
         onEditFormChange={handleEditFormChange}
@@ -1355,7 +1428,42 @@ export default function RoomBookings() {
         isUpdating={updateMutation.isPending}
         selectedRoomIds={editSelectedRoomIds}
         onRoomSelection={handleRoomSelection}
+        showPaymentSection={false}
+        onOpenPaymentDialog={
+          canUpdateRoomBookings ? () => setEditPaymentDialogOpen(true) : undefined
+        }
       />
+
+      <BookingPaymentDialog
+        open={createPaymentDialogOpen}
+        onOpenChange={setCreatePaymentDialogOpen}
+        title="Record Payment (New Room Booking)"
+        description="Apply payment details for this new booking before final create."
+        onSave={() => setCreatePaymentDialogOpen(false)}
+        saveLabel="Use Payment Details"
+      >
+        <PaymentSection
+          form={form}
+          onChange={handleFormChange}
+          roomCount={selectedRoomIds.length || (form.roomId ? 1 : 0)}
+        />
+      </BookingPaymentDialog>
+
+      <BookingPaymentDialog
+        open={editPaymentDialogOpen && !!editBooking}
+        onOpenChange={(open) => setEditPaymentDialogOpen(open)}
+        title={`Record Payment (Room Booking #${editBooking?.id ?? ""})`}
+        description="Save payment/transaction changes without using the edit form."
+        onSave={handleSaveEditPayment}
+        isSaving={updateMutation.isPending}
+      >
+        <PaymentSection
+          form={editForm}
+          onChange={handleEditFormChange}
+          isEdit={true}
+          roomCount={editSelectedRoomIds.length || (editForm.roomId ? 1 : 0)}
+        />
+      </BookingPaymentDialog>
 
       <Dialog open={openDetails} onOpenChange={setOpenDetails}>
         <DialogContent className="p-0 max-w-5xl min-w-[60vw] max-h-[90vh] overflow-y-auto">
@@ -1431,6 +1539,7 @@ export default function RoomBookings() {
             </Button>
             <Button
               variant={updateStatus === "APPROVED" ? "default" : "destructive"}
+              rbacAllowed={canUpdateRoomBookings}
               onClick={() => {
                 if (updateReqBooking) {
                   updateCancellationReqMutation.mutate({
@@ -1441,7 +1550,7 @@ export default function RoomBookings() {
                   });
                 }
               }}
-              disabled={updateCancellationReqMutation.isPending}
+              disabled={!canUpdateRoomBookings || updateCancellationReqMutation.isPending}
             >
               {updateCancellationReqMutation.isPending && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

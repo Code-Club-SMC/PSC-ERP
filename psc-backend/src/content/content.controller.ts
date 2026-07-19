@@ -17,13 +17,15 @@ import {
 import { JwtAccGuard } from 'src/common/guards/jwt-access.guard';
 import { ContentService } from './content.service';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
+import { ModuleAccess, UpsertAccess } from 'src/common/decorators/module-access.decorator';
+import { MODULES } from 'src/common/constants/modules.constants';
 
 @Controller('content')
 export class ContentController {
   constructor(private readonly contentService: ContentService) { }
 
   // --- Events ---
-  @UseGuards(JwtAccGuard)
+  @ModuleAccess(MODULES.CONTENTS)
   @Post('events')
   @UseInterceptors(FilesInterceptor('images', 5)) // Max 5 images
   createEvent(
@@ -40,7 +42,7 @@ export class ContentController {
     return this.contentService.getAllEvents();
   }
 
-  @UseGuards(JwtAccGuard)
+  @ModuleAccess(MODULES.CONTENTS)
   @Put('events/:id')
   @UseInterceptors(FilesInterceptor('images', 5))
   updateEvent(
@@ -53,13 +55,14 @@ export class ContentController {
     return this.contentService.updateEvent(+id, data, adminName, files);
   }
 
+  @ModuleAccess(MODULES.CONTENTS)
   @Delete('events/:id')
   deleteEvent(@Param('id') id: string) {
     return this.contentService.deleteEvent(+id);
   }
 
   // --- Club Rules ---
-  @UseGuards(JwtAccGuard)
+  @ModuleAccess(MODULES.CONTENTS)
   @Post('rules')
   createRule(@Body() data: any, @Req() req: any) {
     const adminName = req.user?.name || 'system';
@@ -71,20 +74,21 @@ export class ContentController {
     return this.contentService.getClubRules(type);
   }
 
-  @UseGuards(JwtAccGuard)
+  @ModuleAccess(MODULES.CONTENTS)
   @Put('rules/:id')
   updateRule(@Param('id') id: string, @Body() data: any, @Req() req: any) {
     const adminName = req.user?.name || 'system';
     return this.contentService.updateClubRule(+id, data, adminName);
   }
 
+  @ModuleAccess(MODULES.CONTENTS)
   @Delete('rules/:id')
   deleteRule(@Param('id') id: string) {
     return this.contentService.deleteClubRule(+id);
   }
 
   // --- Announcements ---
-  @UseGuards(JwtAccGuard)
+  @ModuleAccess(MODULES.CONTENTS)
   @Post('announcements')
   createAnnouncement(@Body() data: any, @Req() req: any) {
     const adminName = req.user?.name || 'system';
@@ -96,7 +100,7 @@ export class ContentController {
     return this.contentService.getAnnouncements();
   }
 
-  @UseGuards(JwtAccGuard)
+  @ModuleAccess(MODULES.CONTENTS)
   @Put('announcements/:id')
   updateAnnouncement(
     @Param('id') id: string,
@@ -107,13 +111,15 @@ export class ContentController {
     return this.contentService.updateAnnouncement(+id, data, adminName);
   }
 
+  @ModuleAccess(MODULES.CONTENTS)
   @Delete('announcements/:id')
   deleteAnnouncement(@Param('id') id: string) {
     return this.contentService.deleteAnnouncement(+id);
   }
 
   // --- About Us ---
-  @UseGuards(JwtAccGuard)
+  @ModuleAccess(MODULES.CONTENTS)
+  @UpsertAccess('id')
   @Post('about-us')
   upsertAboutUs(@Body() data: any, @Req() req: any) {
     const adminName = req.user?.name || 'system';
@@ -126,7 +132,7 @@ export class ContentController {
   }
 
   // --- Club History ---
-  @UseGuards(JwtAccGuard)
+  @ModuleAccess(MODULES.CONTENTS)
   @Post('history')
   @UseInterceptors(FileInterceptor('image'))
   createHistory(
@@ -143,7 +149,7 @@ export class ContentController {
     return this.contentService.getClubHistory();
   }
 
-  @UseGuards(JwtAccGuard)
+  @ModuleAccess(MODULES.CONTENTS)
   @Put('history/:id')
   @UseInterceptors(FileInterceptor('image'))
   updateHistory(
@@ -156,13 +162,14 @@ export class ContentController {
     return this.contentService.updateClubHistory(+id, data, adminName, file);
   }
 
+  @ModuleAccess(MODULES.CONTENTS)
   @Delete('history/:id')
   deleteHistory(@Param('id') id: string) {
     return this.contentService.deleteClubHistory(+id);
   }
 
   // --- Promotional Ads ---
-  @UseGuards(JwtAccGuard)
+  @ModuleAccess(MODULES.CONTENTS)
   @Post('ads')
   @UseInterceptors(FileInterceptor('image'))
   createAd(
@@ -179,7 +186,7 @@ export class ContentController {
     return this.contentService.getAds();
   }
 
-  @UseGuards(JwtAccGuard)
+  @ModuleAccess(MODULES.CONTENTS)
   @Put('ads/:id')
   @UseInterceptors(FileInterceptor('image'))
   updateAd(
@@ -192,26 +199,28 @@ export class ContentController {
     return this.contentService.updateAd(+id, data, adminName, file);
   }
 
+  @ModuleAccess(MODULES.CONTENTS)
   @Delete('ads/:id')
   deleteAd(@Param('id') id: string) {
     return this.contentService.deleteAd(+id);
   }
 
   // --- Contact Us ---
-  @UseGuards(JwtAccGuard)
+  @ModuleAccess(MODULES.CONTENTS)
   @Get('contact-us')
   getContactUs() {
     return this.contentService.getContactUs();
   }
 
-  @UseGuards(JwtAccGuard)
+  @ModuleAccess(MODULES.CONTENTS)
+  @UpsertAccess('id')
   @Post('contact-us')
   upsertContactUs(@Body() data: any, @Req() req: any) {
     const adminName = req.user?.name || 'system';
     return this.contentService.upsertContactUs(data, adminName);
   }
 
-  @UseGuards(JwtAccGuard)
+  @ModuleAccess(MODULES.CONTENTS)
   @Delete('contact-us/:id')
   deleteContactUs(@Param('id') id: string) {
     return this.contentService.deleteContactUs(+id);

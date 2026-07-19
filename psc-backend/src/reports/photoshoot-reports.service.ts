@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { PhotoshootBookingReportDto } from './dtos/photoshoot-report.dto';
+import { parsePakistanDate, toPakistanDateKey } from 'src/utils/time';
 
 @Injectable()
 export class PhotoshootReportsService {
@@ -21,14 +22,15 @@ export class PhotoshootReportsService {
     let toDateParsed: Date | undefined;
 
     if (fromDate) {
-      fromDateParsed = new Date(fromDate);
+      fromDateParsed = parsePakistanDate(fromDate);
+      fromDateParsed.setHours(0, 0, 0, 0);
       if (isNaN(fromDateParsed.getTime())) {
         throw new BadRequestException(`Invalid fromDate format: ${fromDate}`);
       }
     }
 
     if (toDate) {
-      toDateParsed = new Date(toDate);
+      toDateParsed = parsePakistanDate(toDate);
       if (isNaN(toDateParsed.getTime())) {
         throw new BadRequestException(`Invalid toDate format: ${toDate}`);
       }
@@ -91,7 +93,7 @@ export class PhotoshootReportsService {
     dto.memberName = booking.member?.Name ?? booking.guestName ?? '';
     dto.memberNumber = booking.member?.Membership_No ?? '';
     dto.packageDescription = booking.photoshoot?.description ?? '';
-    dto.date = new Date(booking.bookingDate).toISOString().split('T')[0];
+    dto.date = toPakistanDateKey(booking.bookingDate);
     dto.timeSlot = timeSlot;
     dto.charges = Number(booking.totalPrice ?? 0);
     dto.paymentStatus = booking.paymentStatus ?? '';

@@ -5,6 +5,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 @Injectable()
 export class SchedularService {
   private readonly logger = new Logger(SchedularService.name);
+  private readonly AUTO_OUT_OF_ORDER_ACTOR = 'scheduler:auto-out-of-order';
 
   constructor(private prismaService: PrismaService) { }
 
@@ -41,17 +42,21 @@ export class SchedularService {
             .filter((room) => room.isActive)
             .map((room) => room.id);
 
-          // if (roomsToMarkInactive.length > 0) {
-          //   await tx.room.updateMany({
-          //     where: { id: { in: roomsToMarkInactive } },
-          //     data: { isActive: false },
-          //   });
-          //   this.logger.log(`Marked ${roomsToMarkInactive.length} rooms as inactive.`);
-          // }
+          if (roomsToMarkInactive.length > 0) {
+            await tx.room.updateMany({
+              where: { id: { in: roomsToMarkInactive } },
+              data: {
+                isActive: false,
+                updatedBy: this.AUTO_OUT_OF_ORDER_ACTOR,
+              },
+            });
+            this.logger.log(`Marked ${roomsToMarkInactive.length} rooms as inactive.`);
+          }
 
           const roomsToReactivate = await tx.room.findMany({
             where: {
               isActive: false,
+              updatedBy: this.AUTO_OUT_OF_ORDER_ACTOR,
               outOfOrders: {
                 none: {
                   AND: [
@@ -67,7 +72,10 @@ export class SchedularService {
           if (roomsToReactivate.length > 0) {
             await tx.room.updateMany({
               where: { id: { in: roomsToReactivate.map((r) => r.id) } },
-              data: { isActive: true },
+              data: {
+                isActive: true,
+                updatedBy: this.AUTO_OUT_OF_ORDER_ACTOR,
+              },
             });
             this.logger.log(`Reactivated ${roomsToReactivate.length} rooms.`);
           }

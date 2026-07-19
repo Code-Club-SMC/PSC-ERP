@@ -37,12 +37,13 @@ import Search from "./pages/Search";
 import RoomReports from "./pages/reports/RoomReports";
 import HallReports from "./pages/reports/HallReports";
 import PhotoshootReports from "./pages/reports/PhotoshootReports";
+import { canReadModule, ModuleName } from "@/utils/permissions";
 
 
 const queryClient = new QueryClient();
 
 // Map routes to permission titles from your API
-const ROUTE_TO_PERMISSION_MAP: Record<string, string> = {
+const ROUTE_TO_PERMISSION_MAP: Record<string, ModuleName> = {
   "/": "Dashboard",
   "/dashboard": "Dashboard",
   "/members": "Members",
@@ -80,12 +81,15 @@ const ALL_ROUTES = [
   { path: "/members", label: "Members" },
   { path: "/rooms", label: "Rooms" },
   { path: "/bookings/rooms", label: "Room Bookings" },
+  { path: "/reports/rooms", label: "Room Reports" },
   { path: "/halls", label: "Halls" },
   { path: "/bookings/halls", label: "Hall Bookings" },
+  { path: "/reports/halls", label: "Hall Reports" },
   { path: "/lawns", label: "Lawns" },
   { path: "/bookings/lawns", label: "Lawn Bookings" },
   { path: "/photoshoot", label: "Photoshoot" },
   { path: "/bookings/photoshoot", label: "Photoshoot Bookings" },
+  { path: "/reports/photoshoot", label: "Photoshoot Reports" },
   { path: "/sports", label: "Sports" },
   { path: "/affiliated-clubs", label: "Affiliated Clubs" },
   { path: "/notifications", label: "Notifications" },
@@ -101,6 +105,9 @@ const ALL_ROUTES = [
   { path: "/search", label: "Search" }
 ];
 
+function canAccessPermission(permissions: unknown, requiredPermission: ModuleName): boolean {
+  return canReadModule(permissions, requiredPermission);
+}
 
 // Higher-order component to wrap pages with permission check
 function withPermissions(Component: React.ComponentType, allowedRoles: string[] = []) {
@@ -117,7 +124,6 @@ function withPermissions(Component: React.ComponentType, allowedRoles: string[] 
       },
       retry: 1
     });
-    console.log(currentUser);
 
     if (isLoading) {
       return (
@@ -153,34 +159,16 @@ function withPermissions(Component: React.ComponentType, allowedRoles: string[] 
       return <Navigate to="/permission-denied" replace />;
     }
 
-    // Check if user has this permission directly
-    if (permissions.includes(requiredPermission)) {
-      return <Component />;
-    }
-
-    // Unified access for related routes
-    if (["Rooms", "Room Types"].includes(requiredPermission) &&
-      (permissions.includes("Rooms") || permissions.includes("Room Types"))) {
-      return <Component />;
-    }
-
-    if (["Lawns", "Lawn Categories"].includes(requiredPermission) &&
-      (permissions.includes("Lawns") || permissions.includes("Lawn Categories"))) {
-      return <Component />;
-    }
-
-    if (requiredPermission.includes("Bookings") && permissions.includes("Bookings")) {
+    if (canAccessPermission(permissions, requiredPermission)) {
       return <Component />;
     }
 
     return <Navigate to="/permission-denied" replace />;
-
-    return <Component />;
   };
 }
 
 // Function to get first allowed route for a user
-function getFirstAllowedRoute(currentUser: any): string {
+function getFirstAllowedRoute(currentUser: { role?: string; permissions?: unknown }): string {
   const userRole = currentUser.role?.toLowerCase() || 'restricted';
   const permissions = currentUser.permissions || [];
 
@@ -193,15 +181,7 @@ function getFirstAllowedRoute(currentUser: any): string {
   for (const route of ALL_ROUTES) {
     const requiredPermission = ROUTE_TO_PERMISSION_MAP[route.path];
     if (requiredPermission) {
-      if (permissions.includes(requiredPermission)) return route.path;
-      // Unified access for related routes
-      if (["Rooms", "Room Types"].includes(requiredPermission) &&
-        (permissions.includes("Rooms") || permissions.includes("Room Types"))) return route.path;
-
-      if (["Lawns", "Lawn Categories"].includes(requiredPermission) &&
-        (permissions.includes("Lawns") || permissions.includes("Lawn Categories"))) return route.path;
-
-      if (requiredPermission.includes("Bookings") && permissions.includes("Bookings")) return route.path;
+      if (canAccessPermission(permissions, requiredPermission)) return route.path;
     }
   }
 
@@ -240,18 +220,7 @@ export function useCanAccessRoute(routePath: string): boolean {
     return false;
   }
 
-  // Check if user has this permission
-  if (permissions.includes(requiredPermission)) return true;
-  // Unified access for related routes
-  if (["Rooms", "Room Types"].includes(requiredPermission) &&
-    (permissions.includes("Rooms") || permissions.includes("Room Types"))) return true;
-
-  if (["Lawns", "Lawn Categories"].includes(requiredPermission) &&
-    (permissions.includes("Lawns") || permissions.includes("Lawn Categories"))) return true;
-
-  if (requiredPermission.includes("Bookings") && permissions.includes("Bookings")) return true;
-
-  return false;
+  return canAccessPermission(permissions, requiredPermission);
 }
 
 // Hook to get user's role info

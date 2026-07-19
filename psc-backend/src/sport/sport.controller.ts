@@ -12,20 +12,18 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
-import { RolesEnum } from 'src/common/constants/roles.enum';
-import { Roles } from 'src/common/decorators/roles.decorator';
 import { JwtAccGuard } from 'src/common/guards/jwt-access.guard';
-import { RolesGuard } from 'src/common/guards/roles.guard';
 import { CreateSportDto } from './dtos/sport.dto';
 import { SportService } from './sport.service';
+import { ModuleAccess } from 'src/common/decorators/module-access.decorator';
+import { MODULES } from 'src/common/constants/modules.constants';
 
 @Controller('sport')
 export class SportController {
   constructor(private sport: SportService) { }
 
   // sports
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN)
+  @ModuleAccess(MODULES.SPORTS)
   @Post('create/sport')
   @UseInterceptors(FileFieldsInterceptor([{ name: 'files', maxCount: 5 }]))
   async createSport(
@@ -81,8 +79,7 @@ export class SportController {
     return this.sport.createSport(sportPayload, adminName, files?.files || []);
   }
 
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN)
+  @ModuleAccess(MODULES.SPORTS)
   @Patch('update/sport')
   @UseInterceptors(FileFieldsInterceptor([{ name: 'files', maxCount: 5 }]))
   async updateSport(
@@ -165,8 +162,7 @@ export class SportController {
     return this.sport.getSports();
   }
 
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN)
+  @ModuleAccess(MODULES.SPORTS)
   @Delete('delete/sport')
   async deleteSport(@Query('id') id: string) {
     return this.sport.deleteSport(Number(id));

@@ -1,3 +1,4 @@
+import { usePermissionAccess } from "@/hooks/use-permissions";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -172,6 +173,7 @@ const ImageUploadSection = React.memo(function ImageUploadSection({ existingImag
 });
 
 export default function Sports() {
+  const { canCreate, canUpdate, canDelete } = usePermissionAccess("Sports");
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editSport, setEditSport] = useState<any>(null);
   const [deleteData, setDeleteData] = useState<any>(null);
@@ -219,7 +221,7 @@ export default function Sports() {
       <div className="flex justify-between items-center gap-4">
         <div><h2 className="text-3xl font-bold">Sports Activities</h2><p className="text-muted-foreground">Manage sports facilities</p></div>
         <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-          <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-2" />Add Sport</Button></DialogTrigger>
+          <DialogTrigger asChild><Button rbacAllowed={canCreate}><Plus className="h-4 w-4 mr-2" />Add Sport</Button></DialogTrigger>
           <DialogContent className="max-w-7xl h-[90vh] overflow-y-auto flex flex-col">
             <DialogHeader><DialogTitle>Add Sport Activity</DialogTitle></DialogHeader>
             <div className="py-4 flex-1">
@@ -240,7 +242,7 @@ export default function Sports() {
                 <TabsContent value="rules" className="mt-4"><RichTextSection title="General Rules" dosLabel="✓ Do's" dontsLabel="✗ Don'ts" dosValue={form.dos} dontsValue={form.donts} onDosChange={v => setForm(p => ({ ...p, dos: v }))} onDontsChange={v => setForm(p => ({ ...p, donts: v }))} /></TabsContent>
               </Tabs>
             </div>
-            <DialogFooter><Button variant="outline" onClick={() => setIsAddOpen(false)}>Cancel</Button><Button onClick={handleCreate} disabled={createMutation.isPending}>{createMutation.isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Creating...</> : "Add"}</Button></DialogFooter>
+            <DialogFooter><Button variant="outline" onClick={() => setIsAddOpen(false)}>Cancel</Button><Button rbacAllowed={canCreate} onClick={handleCreate} disabled={createMutation.isPending}>{createMutation.isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Creating...</> : "Add"}</Button></DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
@@ -259,8 +261,8 @@ export default function Sports() {
                   <TableCell>{s.isActive ? <Badge className="bg-green-600"><CheckCircle className="h-3 w-3 mr-1" />Active</Badge> : <Badge variant="secondary"><XCircle className="h-3 w-3 mr-1" />Inactive</Badge>}</TableCell>
                   <TableCell className="text-right space-x-1">
                     <Button variant="ghost" size="icon" onClick={() => setViewSport(s)} title="View"><Eye className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" onClick={() => setEditSport(s)} title="Edit"><Edit className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" onClick={() => setDeleteData(s)} title="Delete"><Trash2 className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" rbacAllowed={canUpdate} onClick={() => setEditSport(s)} title="Edit"><Edit className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" rbacAllowed={canDelete} onClick={() => setDeleteData(s)} title="Delete"><Trash2 className="h-4 w-4" /></Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -291,7 +293,7 @@ export default function Sports() {
               <TabsContent value="rules" className="mt-4"><RichTextSection title="General Rules" dosLabel="✓ Do's" dontsLabel="✗ Don'ts" dosValue={editForm.dos} dontsValue={editForm.donts} onDosChange={v => setEditForm(p => ({ ...p, dos: v }))} onDontsChange={v => setEditForm(p => ({ ...p, donts: v }))} /></TabsContent>
             </Tabs>
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => setEditSport(null)}>Cancel</Button><Button onClick={handleUpdate} disabled={updateMutation.isPending}>{updateMutation.isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Updating...</> : "Update"}</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setEditSport(null)}>Cancel</Button><Button rbacAllowed={canUpdate} onClick={handleUpdate} disabled={updateMutation.isPending}>{updateMutation.isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Updating...</> : "Update"}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -300,7 +302,7 @@ export default function Sports() {
         <DialogContent>
           <DialogHeader><DialogTitle>Delete Sport</DialogTitle></DialogHeader>
           <p className="py-4 text-muted-foreground">Delete <strong>{deleteData?.activity}</strong>?</p>
-          <DialogFooter><Button variant="outline" onClick={() => setDeleteData(null)}>Cancel</Button><Button variant="destructive" onClick={() => deleteMutation.mutate(deleteData?.id)} disabled={deleteMutation.isPending}>{deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete"}</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setDeleteData(null)}>Cancel</Button><Button variant="destructive" rbacAllowed={canDelete} onClick={() => deleteMutation.mutate(deleteData?.id)} disabled={deleteMutation.isPending}>{deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete"}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 

@@ -1,10 +1,10 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import { HallReportsService } from './hall-reports.service';
-import { JwtAccGuard } from 'src/common/guards/jwt-access.guard';
-import { RolesGuard } from 'src/common/guards/roles.guard';
+import { ModuleAccess } from 'src/common/decorators/module-access.decorator';
+import { MODULES } from 'src/common/constants/modules.constants';
 
 @Controller('reports/halls')
-@UseGuards(JwtAccGuard, RolesGuard)
+@ModuleAccess(MODULES.HALL_REPORTS)
 export class HallReportsController {
   constructor(private readonly hallReportsService: HallReportsService) {}
 

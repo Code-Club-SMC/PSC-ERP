@@ -1,3 +1,4 @@
+import { usePermissionAccess } from "@/hooks/use-permissions";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -26,6 +27,7 @@ import {
 } from "../../config/apis";
 
 export default function Messing() {
+  const { canCreate, canUpdate, canDelete } = usePermissionAccess("Messing");
     const [activeTab, setActiveTab] = useState("categories");
 
     return (
@@ -56,6 +58,7 @@ export default function Messing() {
 // -------------------- CATEGORIES TAB -------------------- //
 
 function CategoriesTab() {
+    const { canCreate, canUpdate, canDelete } = usePermissionAccess("Messing");
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [editingCategory, setEditingCategory] = useState<any>(null);
     const [selectedCategory, setSelectedCategory] = useState<any>(null);
@@ -91,7 +94,7 @@ function CategoriesTab() {
     return (
         <div className="space-y-4">
             <div className="flex justify-end">
-                <Button onClick={() => setIsAddOpen(true)}>
+                <Button rbacAllowed={canCreate} onClick={() => setIsAddOpen(true)}>
                     <Plus className="h-4 w-4 mr-2" /> Add Category
                 </Button>
             </div>
@@ -116,10 +119,10 @@ function CategoriesTab() {
                                     <ChevronRight className="h-4 w-4 text-muted-foreground" />
                                 </div>
                                 <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                                    <Button variant="ghost" size="icon" onClick={() => setEditingCategory(cat)}>
+                                    <Button rbacAllowed={canUpdate} variant="ghost" size="icon" onClick={() => setEditingCategory(cat)}>
                                         <Edit className="h-4 w-4" />
                                     </Button>
-                                    <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => {
+                                    <Button rbacAllowed={canDelete} variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => {
                                         if (confirm("Delete this category?")) deleteMutation.mutate(cat.id);
                                     }}>
                                         <Trash2 className="h-4 w-4" />
@@ -149,6 +152,7 @@ function CategoriesTab() {
 // -------------------- SUB-CATEGORIES VIEW -------------------- //
 
 function SubCategoriesView({ category, onBack }: { category: any; onBack: () => void }) {
+    const { canCreate, canUpdate, canDelete } = usePermissionAccess("Messing");
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [editingSubCategory, setEditingSubCategory] = useState<any>(null);
     const { toast } = useToast();
@@ -182,7 +186,7 @@ function SubCategoriesView({ category, onBack }: { category: any; onBack: () => 
                         <p className="text-sm text-muted-foreground">Sub-categories</p>
                     </div>
                 </div>
-                <Button onClick={() => setIsAddOpen(true)}>
+                <Button rbacAllowed={canCreate} onClick={() => setIsAddOpen(true)}>
                     <Plus className="h-4 w-4 mr-2" /> Add Sub-Category
                 </Button>
             </div>
@@ -199,10 +203,10 @@ function SubCategoriesView({ category, onBack }: { category: any; onBack: () => 
                                 <div className="flex justify-between items-start">
                                     <CardTitle className="text-lg">{sub.name}</CardTitle>
                                     <div className="flex gap-1">
-                                        <Button variant="ghost" size="icon" onClick={() => setEditingSubCategory(sub)}>
+                                        <Button rbacAllowed={canUpdate} variant="ghost" size="icon" onClick={() => setEditingSubCategory(sub)}>
                                             <Edit className="h-4 w-4" />
                                         </Button>
-                                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => {
+                                        <Button rbacAllowed={canDelete} variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => {
                                             if (confirm("Delete this sub-category?")) deleteMutation.mutate(sub.id);
                                         }}>
                                             <Trash2 className="h-4 w-4" />
@@ -234,6 +238,7 @@ function SubCategoriesView({ category, onBack }: { category: any; onBack: () => 
 // -------------------- CATEGORY DIALOG -------------------- //
 
 function CategoryDialog({ open, onOpenChange, initialData }: any) {
+    const { canCreate, canUpdate, canDelete } = usePermissionAccess("Messing");
     const [name, setName] = useState("");
     const [order, setOrder] = useState<number | string>(0);
     const [existingImages, setExistingImages] = useState<any[]>([]);
@@ -381,7 +386,7 @@ function CategoryDialog({ open, onOpenChange, initialData }: any) {
                     </div>
                 </div>
                 <DialogFooter>
-                    <Button disabled={createMutation.isPending || updateMutation.isPending} onClick={handleSubmit}>
+                    <Button rbacAllowed={initialData ? canUpdate : canCreate} disabled={createMutation.isPending || updateMutation.isPending} onClick={handleSubmit}>
                         {initialData ? "Save Changes" : "Create Category"}
                     </Button>
                 </DialogFooter>
@@ -393,6 +398,7 @@ function CategoryDialog({ open, onOpenChange, initialData }: any) {
 // -------------------- SUB-CATEGORY DIALOG -------------------- //
 
 function SubCategoryDialog({ open, onOpenChange, initialData, categoryId }: any) {
+    const { canCreate, canUpdate, canDelete } = usePermissionAccess("Messing");
     const [name, setName] = useState("");
     const [order, setOrder] = useState<number | string>(0);
 
@@ -464,7 +470,7 @@ function SubCategoryDialog({ open, onOpenChange, initialData, categoryId }: any)
                     </div>
                 </div>
                 <DialogFooter>
-                    <Button disabled={createMutation.isPending || updateMutation.isPending} onClick={handleSubmit}>
+                    <Button rbacAllowed={initialData ? canUpdate : canCreate} disabled={createMutation.isPending || updateMutation.isPending} onClick={handleSubmit}>
                         {initialData ? "Save Changes" : "Create Sub-Category"}
                     </Button>
                 </DialogFooter>
@@ -477,6 +483,7 @@ function SubCategoryDialog({ open, onOpenChange, initialData, categoryId }: any)
 // -------------------- MENU ITEMS TAB -------------------- //
 
 function MenuItemsTab() {
+    const { canCreate, canUpdate, canDelete } = usePermissionAccess("Messing");
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [selectedSubCategory, setSelectedSubCategory] = useState<string | null>(null);
     const [isAddOpen, setIsAddOpen] = useState(false);
@@ -550,7 +557,7 @@ function MenuItemsTab() {
                     </div>
                 </div>
 
-                <Button disabled={!selectedSubCategory} onClick={() => setIsAddOpen(true)}>
+                <Button rbacAllowed={canCreate} disabled={!selectedSubCategory} onClick={() => setIsAddOpen(true)}>
                     <Plus className="h-4 w-4 mr-2" /> Add Item
                 </Button>
             </div>
@@ -580,10 +587,10 @@ function MenuItemsTab() {
                                     <p className="font-medium mt-1">PKR {item.price}</p>
                                 </div>
                                 <div className="flex gap-2">
-                                    <Button variant="ghost" size="icon" onClick={() => setEditingItem(item)}>
+                                    <Button rbacAllowed={canUpdate} variant="ghost" size="icon" onClick={() => setEditingItem(item)}>
                                         <Edit className="h-4 w-4" />
                                     </Button>
-                                    <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => {
+                                    <Button rbacAllowed={canDelete} variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => {
                                         if (confirm("Delete this item?")) deleteMutation.mutate(item.id);
                                     }}>
                                         <Trash2 className="h-4 w-4" />
@@ -611,6 +618,7 @@ function MenuItemsTab() {
 }
 
 function ItemDialog({ open, onOpenChange, initialData, subCategoryId }: any) {
+    const { canCreate, canUpdate, canDelete } = usePermissionAccess("Messing");
     const [form, setForm] = useState({
         name: initialData?.name || "",
         description: initialData?.description || "",
@@ -698,7 +706,7 @@ function ItemDialog({ open, onOpenChange, initialData, subCategoryId }: any) {
                     </div>
                 </div>
                 <DialogFooter>
-                    <Button disabled={createMutation.isPending || updateMutation.isPending} onClick={handleSubmit}>
+                    <Button rbacAllowed={initialData ? canUpdate : canCreate} disabled={createMutation.isPending || updateMutation.isPending} onClick={handleSubmit}>
                         {initialData ? "Save Changes" : "Add Item"}
                     </Button>
                 </DialogFooter>

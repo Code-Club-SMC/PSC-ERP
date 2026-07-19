@@ -21,9 +21,7 @@ import {
   Utensils,
   MessageSquare,
   Search as SearchIcon,
-  BarChart2
 } from "lucide-react";
-
 
 import {
   Sidebar,
@@ -42,9 +40,9 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useQuery } from "@tanstack/react-query";
 import { userWho } from "../../config/apis";
+import { canReadModule, ModuleName } from "@/utils/permissions";
 
-// Map routes to permission titles (must match your API's permission names)
-const ROUTE_TO_PERMISSION_MAP: Record<string, string> = {
+const ROUTE_TO_PERMISSION_MAP: Record<string, ModuleName> = {
   "/": "Dashboard",
   "/dashboard": "Dashboard",
   "/members": "Members",
@@ -73,14 +71,12 @@ const ROUTE_TO_PERMISSION_MAP: Record<string, string> = {
   "/reports/rooms": "Room Reports",
   "/reports/halls": "Hall Reports",
   "/reports/photoshoot": "Photoshoot Reports",
-  // "/reports": "Reports"
 };
 
 const menuItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Search", url: "/search", icon: SearchIcon },
   { title: "Members", url: "/members", icon: Users },
-
   { title: "Accounts", url: "/accounts", icon: Wallet },
   { title: "Admins", url: "/admins", icon: UserCog },
   { title: "Admin Reservations", url: "/admin-reservations", icon: CalendarDays },
@@ -129,7 +125,6 @@ const menuItems = [
   { title: "Calendar", url: "/calendar", icon: CalendarDays },
   { title: "Contents", url: "/contents", icon: Text },
   { title: "Feedback", url: "/feedback", icon: MessageSquare },
-  // { title: "Reports", url: "/reports", icon: BarChart2 },
 ];
 
 export function AppSidebar() {
@@ -147,45 +142,25 @@ export function AppSidebar() {
   const userRole = currentUser.role;
   const permissions = currentUser.permissions || [];
 
-  // Check if user can access a route based on permissions
   const canAccessRoute = (route: string): boolean => {
-    // SUPER_ADMIN has access to everything
     if (userRole === "SUPER_ADMIN") return true;
-
-    // Get the permission title for this route
     const requiredPermission = ROUTE_TO_PERMISSION_MAP[route];
-
-    // If no permission mapping exists, deny access
-    if (!requiredPermission) return false;
-
-    // Check if user has this permission
-    if (permissions.includes(requiredPermission)) return true;
-
-    // Unified access for related routes
-    if (["Rooms", "Room Types"].includes(requiredPermission) &&
-      (permissions.includes("Rooms") || permissions.includes("Room Types"))) return true;
-
-    if (["Lawns", "Lawn Categories"].includes(requiredPermission) &&
-      (permissions.includes("Lawns") || permissions.includes("Lawn Categories"))) return true;
-
-    if (requiredPermission.includes("Bookings") && permissions.includes("Bookings")) return true;
-
-    return false;
+    return !!requiredPermission && canReadModule(permissions, requiredPermission);
   };
 
   return (
     <Sidebar collapsible="icon">
       <SidebarContent>
-        <SidebarGroup className="px-3">
-          <SidebarGroupLabel className="text-sidebar-foreground text-lg font-bold px-4 py-6 mb-2 flex items-center justify-start">
+        <SidebarGroup className="px-2">
+          <SidebarGroupLabel className="text-sidebar-foreground text-[0.8462rem] font-semibold px-2 py-3 mb-1 flex items-center justify-start">
             {open ? (
-              <img src={logo} alt="Peshawar Services" className="h-12 w-auto" />
+              <img src={logo} alt="Peshawar Services Club" className="h-9 w-auto" />
             ) : (
-              <img src={logo} alt="PS" className="h-8 w-auto" />
+              <img src={logo} alt="PSC" className="h-6 w-auto" />
             )}
           </SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu className="space-y-2">
+            <SidebarMenu className="space-y-0.5">
               {menuItems.map((item) => {
                 if (item.items) {
                   const isActive = item.items.some(sub => location.pathname === sub.url);
@@ -195,24 +170,28 @@ export function AppSidebar() {
                         <CollapsibleTrigger asChild>
                           <SidebarMenuButton
                             tooltip={item.title}
-                            className={`py-2 ${isActive ? "bg-sidebar-accent" : ""}`}
+                            className={`py-1.5 text-[0.7692rem] ${isActive ? "bg-sidebar-accent" : ""}`}
                           >
-                            {item.icon && <item.icon className="h-5 w-5" />}
+                            {item.icon && <item.icon className="h-3.5 w-3.5" aria-hidden="true" />}
                             <span>{item.title}</span>
-                            <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
+                            <ChevronDown className="ml-auto h-3 w-3 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
                           </SidebarMenuButton>
                         </CollapsibleTrigger>
                         <CollapsibleContent>
-                          <SidebarMenuSub className="ml-4 space-y-1">
+                          <SidebarMenuSub className="mx-0 ml-6 space-y-1 border-l border-sidebar-border/25 py-1 pl-3 pr-0">
                             {item.items.map(subItem => {
                               const allowed = canAccessRoute(subItem.url);
                               return (
                                 <SidebarMenuSubItem key={subItem.title}>
-                                  <SidebarMenuSubButton asChild>
+                                  <SidebarMenuSubButton asChild className="h-8 rounded-md px-2">
                                     <NavLink
                                       to={allowed ? subItem.url : "#"}
-                                      className={`hover:bg-sidebar-accent/50 flex items-center justify-between py-1 ${!allowed ? "opacity-50 cursor-not-allowed" : ""}`}
-                                      activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                                      className={`flex w-full items-center justify-between text-[0.7692rem] ${allowed ? "hover:bg-sidebar-accent/50" : "cursor-not-allowed opacity-45 hover:bg-transparent"}`}
+                                      activeClassName={
+                                        allowed
+                                          ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                                          : ""
+                                      }
                                       onClick={(e) => {
                                         if (!allowed) {
                                           e.preventDefault();
@@ -220,7 +199,7 @@ export function AppSidebar() {
                                       }}
                                     >
                                       <span>{subItem.title}</span>
-                                      {!allowed && <Lock className="h-4 w-4 ml-2" />}
+                                      {!allowed && <Lock className="h-3 w-3 ml-1.5" aria-label="No access" />}
                                     </NavLink>
                                   </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
@@ -233,23 +212,27 @@ export function AppSidebar() {
                   );
                 }
 
-                const allowed = canAccessRoute(item.url);
+                const allowed = canAccessRoute(item.url!);
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild tooltip={item.title}>
                       <NavLink
-                        to={allowed ? item.url : "#"}
-                        className={`hover:bg-sidebar-accent/50 py-2 flex items-center ${!allowed ? "opacity-50 cursor-not-allowed" : ""}`}
-                        activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                        to={allowed ? item.url! : "#"}
+                        className={`hover:bg-sidebar-accent/50 py-1.5 flex items-center text-[0.7692rem] ${!allowed ? "opacity-50 cursor-not-allowed" : ""}`}
+                        activeClassName={
+                          allowed
+                            ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                            : ""
+                        }
                         onClick={(e) => {
                           if (!allowed) {
                             e.preventDefault();
                           }
                         }}
                       >
-                        {item.icon && <item.icon className="h-5 w-5" />}
+                        {item.icon && <item.icon className="h-3.5 w-3.5" aria-hidden="true" />}
                         <span>{item.title}</span>
-                        {!allowed && <Lock className="h-4 w-4 ml-2" />}
+                        {!allowed && <Lock className="h-3 w-3 ml-1.5" aria-label="No access" />}
                       </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

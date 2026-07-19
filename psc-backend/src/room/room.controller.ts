@@ -13,14 +13,13 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
-import { RolesEnum } from 'src/common/constants/roles.enum';
-import { Roles } from 'src/common/decorators/roles.decorator';
 import { JwtAccGuard } from 'src/common/guards/jwt-access.guard';
-import { RolesGuard } from 'src/common/guards/roles.guard';
 import { RoomTypeDto } from './dtos/room-type.dto';
 import { RoomService } from './room.service';
 import { RoomDto } from './dtos/room.dto';
 import type { Response } from 'express';
+import { ModuleAccess } from 'src/common/decorators/module-access.decorator';
+import { MODULES } from 'src/common/constants/modules.constants';
 
 @Controller('room')
 export class RoomController {
@@ -28,8 +27,7 @@ export class RoomController {
 
   // room types //
 
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN)
+  @ModuleAccess(MODULES.ROOM_TYPES)
   @UseInterceptors(FileFieldsInterceptor([{ name: 'files', maxCount: 5 }]))
   @Post('create/roomType')
   async createRoomType(
@@ -54,8 +52,7 @@ export class RoomController {
     );
   }
 
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN)
+  @ModuleAccess(MODULES.ROOM_TYPES)
   @Patch('update/roomType')
   @UseInterceptors(FileFieldsInterceptor([{ name: 'files', maxCount: 5 }]))
   async updateRoomType(
@@ -108,8 +105,7 @@ export class RoomController {
   async getRoomTypes() {
     return await this.room.getRoomTypes();
   }
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN)
+  @ModuleAccess(MODULES.ROOM_TYPES)
   @Delete('delete/roomType')
   async deleteRoomType(@Query('id') id: string) {
     return await this.room.deleteRoomType(Number(id));
@@ -138,8 +134,7 @@ export class RoomController {
     return await this.room.getAvailRooms(Number(roomTypeId.roomTypeId));
   }
 
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN)
+  @ModuleAccess(MODULES.ROOMS)
   @Post('create/room')
   async createRoom(
     @Body() payload: RoomDto,
@@ -150,8 +145,7 @@ export class RoomController {
     return await this.room.createRoom(payload, adminName);
   }
 
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN)
+  @ModuleAccess(MODULES.ROOMS)
   @Patch('update/room')
   async updateRoom(
     @Body() payload: RoomDto,
@@ -163,16 +157,14 @@ export class RoomController {
     return await this.room.updateRoom(payload, adminName);
   }
 
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN)
+  @ModuleAccess(MODULES.ROOMS)
   @Delete('delete/room')
   async deleteRoom(@Query('id') id: string) {
     return await this.room.deleteRoom(Number(id));
   }
 
   // reserve room(s)
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN)
+  @ModuleAccess(MODULES.ROOMS)
   @Patch('reserve/rooms')
   async reserveRooms(
     @Req() req: { user: { id: string } },

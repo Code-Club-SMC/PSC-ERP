@@ -13,10 +13,10 @@ export class StatusGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
-    const { user, body } = request;
+    const { user } = request;
 
-    // Prefer membership number coming from the frontend payload; fall back to JWT user id
-    const membership_no = body.membership_no ?? user?.id;
+    // JWT subject is authoritative for member flows.
+    const membership_no = user?.id;
 
     if (membership_no) {
       // check member status

@@ -20,6 +20,11 @@ import {
   BillPaymentRequestDto,
 } from './dtos/kuickpay.dto';
 import { Throttle } from '@nestjs/throttler';
+import {
+  ActionAccess,
+  ModuleAccess,
+} from 'src/common/decorators/module-access.decorator';
+import { MODULES } from 'src/common/constants/modules.constants';
 
 @Controller('payment')
 export class PaymentController {
@@ -38,8 +43,7 @@ export class PaymentController {
     @Body() bookingData: any,
     @Req() req: { user: { id: string } },
   ) {
-    // Prefer membership number coming from the frontend payload; fall back to JWT user id
-    const membership_no = bookingData.membership_no ?? req.user?.id;
+    const membership_no = req.user?.id;
     return await this.payment.genInvoiceRoom(Number(roomType), {
       ...bookingData,
       membership_no,
@@ -54,8 +58,7 @@ export class PaymentController {
     @Body() bookingData: any,
     @Req() req: { user: { id: string } },
   ) {
-    // Prefer membership number coming from the frontend payload; fall back to JWT user id
-    const membership_no = bookingData.membership_no ?? req.user?.id;
+    const membership_no = req.user?.id;
     return await this.payment.genInvoiceHall(Number(hallId), {
       ...bookingData,
       membership_no,
@@ -70,8 +73,7 @@ export class PaymentController {
     @Body() bookingData: any,
     @Req() req: { user: { id: string } },
   ) {
-    // Prefer membership number coming from the frontend payload; fall back to JWT user id
-    const membership_no = bookingData.membership_no ?? req.user?.id;
+    const membership_no = req.user?.id;
     return await this.payment.genInvoiceLawn(Number(lawnId), {
       ...bookingData,
       membership_no,
@@ -85,8 +87,7 @@ export class PaymentController {
     @Body() bookingData: any,
     @Req() req: { user: { id: string } },
   ) {
-    // Prefer membership number coming from the frontend payload; fall back to JWT user id
-    const membership_no = bookingData.membership_no ?? req.user?.id;
+    const membership_no = req.user?.id;
     return await this.payment.genInvoicePhotoshoot(Number(photoshootId), {
       ...bookingData,
       membership_no,
@@ -101,8 +102,7 @@ export class PaymentController {
     @Body() bookingData: any,
     @Req() req: { user: { id: string } },
   ) {
-    // Prefer membership number coming from the frontend payload; fall back to JWT user id
-    const membership_no = bookingData.membership_no ?? req.user?.id;
+    const membership_no = req.user?.id;
     return await this.payment.genInvoiceBalance({
       ...bookingData,
       membership_no,
@@ -111,24 +111,48 @@ export class PaymentController {
 
   ///////////////////////////////////////////////////////////////////////////////
 
+  @UseGuards(JwtAccGuard)
   @Get('member/vouchers')
-  async getMemberVouchers(@Query('membershipNo') membershipNo: string) {
+  async getMemberVouchers(@Req() req: { user: { id: string } }) {
     // await this.payment.cleanupExpiredVouchers(membershipNo);
+    return await this.payment.getMemberVouchers(req.user?.id);
+  }
+
+  @ModuleAccess(MODULES.ACCOUNTS)
+  @Get('admin/member-vouchers')
+  async getMemberVouchersAdmin(@Query('membershipNo') membershipNo: string) {
     return await this.payment.getMemberVouchers(membershipNo);
   }
 
   @UseGuards(JwtAccGuard)
   @Get('bill-payment-history/:membershipNo')
-  async getBillPaymentHistory(@Param('membershipNo') membershipNo: string) {
+  async getBillPaymentHistory(@Req() req: { user: { id: string } }) {
+    return this.payment.getBillPaymentHistory(req.user?.id);
+  }
+
+  @ModuleAccess(MODULES.ACCOUNTS)
+  @Get('admin/bill-payment-history/:membershipNo')
+  async getBillPaymentHistoryAdmin(@Param('membershipNo') membershipNo: string) {
     return this.payment.getBillPaymentHistory(membershipNo);
   }
 
   @UseGuards(JwtAccGuard)
   @Post('balance/cancel/:id')
-  async cancelBalanceVoucher(@Param('id', ParseIntPipe) id: number) {
+  async cancelBalanceVoucher(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: { user: { id: string } },
+  ) {
+    return await this.payment.cancelBalanceVoucher(id, req.user?.id);
+  }
+
+  @ModuleAccess(MODULES.ACCOUNTS)
+  @ActionAccess('update')
+  @Post('admin/balance/cancel/:id')
+  async cancelBalanceVoucherAdmin(@Param('id', ParseIntPipe) id: number) {
     return await this.payment.cancelBalanceVoucher(id);
   }
 
+  @ModuleAccess(MODULES.ACCOUNTS)
   @Get('voucher/booking')
   async getVouchersByBooking(
     @Query('bookingType') bookingType: string,
@@ -147,6 +171,8 @@ export class PaymentController {
     );
   }
 
+  @ModuleAccess(MODULES.ACCOUNTS)
+  @ActionAccess('update')
   @Post('confirm/:type/:id')
   async confirmBooking(@Param('type') type: string, @Param('id') id: string) {
     return await this.payment.confirmBooking(type, Number(id));

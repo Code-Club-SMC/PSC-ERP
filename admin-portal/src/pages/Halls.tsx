@@ -1,3 +1,4 @@
+import { usePermissionAccess } from "@/hooks/use-permissions";
 import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -618,6 +619,7 @@ function HallDetailDialog({
 }
 
 export default function Halls() {
+  const { canCreate, canUpdate, canDelete } = usePermissionAccess("Halls");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -1508,6 +1510,7 @@ export default function Halls() {
 
           <Button
             variant="outline"
+            rbacAllowed={canUpdate}
             onClick={() => setReserveDialog(true)}
             className="gap-2"
             disabled={isLoading}
@@ -1518,7 +1521,7 @@ export default function Halls() {
 
           <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
             <DialogTrigger asChild>
-              <Button className="gap-2">
+              <Button rbacAllowed={canCreate} className="gap-2">
                 <Plus className="h-4 w-4" />
                 Add Hall
               </Button>
@@ -2025,6 +2028,7 @@ export default function Halls() {
                         <Button
                           variant="ghost"
                           size="icon"
+                          rbacAllowed={canUpdate}
                           onClick={() => setEditHall(hall)}
                         >
                           <Edit className="h-4 w-4" />
@@ -2032,6 +2036,7 @@ export default function Halls() {
                         <Button
                           variant="ghost"
                           size="icon"
+                          rbacAllowed={canDelete}
                           onClick={() => setDeleteHallData(hall)}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -2309,7 +2314,7 @@ export default function Halls() {
                   Cancel
                 </Button>
                 <Button
-                  onClick={handleBulkReserve}
+                  rbacAllowed={canUpdate} onClick={handleBulkReserve}
                   disabled={
                     reserveMutation.isPending ||
                     !reserveDates.from ||
@@ -2683,6 +2688,7 @@ export default function Halls() {
             </Button>
             <Button
               variant="destructive"
+              rbacAllowed={canDelete}
               onClick={handleDeleteHall}
               disabled={deleteMutation.isPending}
             >

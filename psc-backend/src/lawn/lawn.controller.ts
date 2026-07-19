@@ -13,15 +13,14 @@ import {
 } from '@nestjs/common';
 import { LawnService } from './lawn.service';
 import { JwtAccGuard } from 'src/common/guards/jwt-access.guard';
-import { RolesGuard } from 'src/common/guards/roles.guard';
-import { Roles } from 'src/common/decorators/roles.decorator';
-import { RolesEnum } from 'src/common/constants/roles.enum';
 import { LawnCategory } from './dtos/lawn-category.dto';
 import {
   FileFieldsInterceptor,
   FilesInterceptor,
 } from '@nestjs/platform-express';
 import { LawnDto } from './dtos/lawn.dto';
+import { ModuleAccess } from 'src/common/decorators/module-access.decorator';
+import { MODULES } from 'src/common/constants/modules.constants';
 
 @Controller('lawn')
 export class LawnController {
@@ -43,8 +42,7 @@ export class LawnController {
     return this.lawn.getLawnNames(Number(catId.catId));
   }
 
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN)
+  @ModuleAccess(MODULES.LAWN_CATEGORIES)
   @UseInterceptors(FileFieldsInterceptor([{ name: 'files', maxCount: 5 }]))
   @Post('create/lawn/category')
   async createLawnCategory(
@@ -66,8 +64,7 @@ export class LawnController {
     );
   }
 
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN)
+  @ModuleAccess(MODULES.LAWN_CATEGORIES)
   @Patch('update/lawn/category')
   @UseInterceptors(FileFieldsInterceptor([{ name: 'files', maxCount: 5 }]))
   async updateLawnCategory(
@@ -109,24 +106,21 @@ export class LawnController {
     );
   }
 
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN)
+  @ModuleAccess(MODULES.LAWN_CATEGORIES)
   @Delete('delete/lawn/category')
   async deleteLawnCategory(@Query('catID') catID: string) {
     return this.lawn.deleteLawnCategory(Number(catID));
   }
 
   // lawns
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN)
+  @ModuleAccess(MODULES.LAWNS)
   @Post('create/lawn')
   async createLawn(@Body() payload: LawnDto, @Req() req: any) {
     const adminName = req.user?.name || 'system';
     return this.lawn.createLawn(payload, adminName);
   }
 
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN)
+  @ModuleAccess(MODULES.LAWNS)
   @Patch('update/lawn')
   async updateLawn(@Body() payload: Partial<LawnDto>, @Req() req: any) {
     const adminName = req.user?.name || 'system';
@@ -141,8 +135,7 @@ export class LawnController {
     return this.lawn.getLawns();
   }
 
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN, RolesEnum.ADMIN)
+  @ModuleAccess(MODULES.LAWN_BOOKINGS)
   @Get('get/lawns/calendar')
   async getCalendarLawns() {
     return this.lawn.getCalendarLawns();
@@ -155,8 +148,7 @@ export class LawnController {
   async getAvailLawns(@Query('catId') catId: string) {
     return this.lawn.getLawnNames(Number(catId));
   }
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN)
+  @ModuleAccess(MODULES.LAWNS)
   @Delete('delete/lawn')
   async deleteLawn(@Query('id') id: string) {
     return this.lawn.deleteLawn(Number(id));
@@ -175,8 +167,7 @@ export class LawnController {
   }
 
   // ─────────────────────────── LAWN RESERVATIONS ───────────────────────────
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN, RolesEnum.ADMIN)
+  @ModuleAccess(MODULES.LAWNS)
   @Patch('reserve/lawns')
   async reserveLawns(
     @Req() req,

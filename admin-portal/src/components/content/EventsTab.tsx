@@ -1,3 +1,4 @@
+import { usePermissionAccess } from "@/hooks/use-permissions";
 
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -42,6 +43,7 @@ const quillFormats = [
 ];
 
 export default function EventsTab() {
+    const { canCreate, canUpdate, canDelete } = usePermissionAccess("Contents");
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [editEvent, setEditEvent] = useState<any>(null);
     const [deleteData, setDeleteData] = useState<any>(null);
@@ -120,7 +122,7 @@ export default function EventsTab() {
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <h3 className="text-2xl font-semibold">Events</h3>
-                <Button onClick={() => setIsAddOpen(true)} className="gap-2">
+                <Button rbacAllowed={canCreate} onClick={() => setIsAddOpen(true)} className="gap-2">
                     <Plus className="h-4 w-4" /> Add Event
                 </Button>
             </div>
@@ -138,8 +140,8 @@ export default function EventsTab() {
                             <div className="flex justify-between items-start">
                                 <h4 className="font-bold text-lg">{event.title}</h4>
                                 <div className="flex gap-2">
-                                    <Button variant="ghost" size="icon" onClick={() => setEditEvent(event)}><Edit className="h-4 w-4" /></Button>
-                                    <Button variant="ghost" size="icon" onClick={() => setDeleteData(event)}><Trash2 className="h-4 w-4" /></Button>
+                                    <Button rbacAllowed={canUpdate} variant="ghost" size="icon" onClick={() => setEditEvent(event)}><Edit className="h-4 w-4" /></Button>
+                                    <Button rbacAllowed={canDelete} variant="ghost" size="icon" onClick={() => setDeleteData(event)}><Trash2 className="h-4 w-4" /></Button>
                                 </div>
                             </div>
 
@@ -185,7 +187,7 @@ export default function EventsTab() {
                     <p>Are you sure you want to delete <strong>{deleteData?.title}</strong>?</p>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setDeleteData(null)} disabled={deleteMutation.isPending}>Cancel</Button>
-                        <Button variant="destructive" onClick={() => deleteMutation.mutate(deleteData.id)} disabled={deleteMutation.isPending}>
+                        <Button rbacAllowed={canDelete} variant="destructive" onClick={() => deleteMutation.mutate(deleteData.id)} disabled={deleteMutation.isPending}>
                             {deleteMutation.isPending ? "Deleting..." : "Delete"}
                         </Button>
                     </DialogFooter>

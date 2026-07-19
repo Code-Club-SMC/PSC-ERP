@@ -1,6 +1,6 @@
 import axios from "axios";
-const base_url = "http://localhost:3000/api";
-// const base_url = "https://admin.peshawarservicesclub.com/api";
+// const base_url = "http://localhost:3000/api";
+const base_url = "https://admin.peshawarservicesclub.com/api";
 
 export const authAdmin = async (data: any): Promise<any> => {
   try {
@@ -182,7 +182,8 @@ export const getMembers = async ({
   if (status) params.append("status", status);
 
   const res = await axios.get(
-    `${base_url}/member/get/members?${params.toString()}`
+    `${base_url}/member/admin/get/members?${params.toString()}`,
+    { withCredentials: true },
   );
   if (res.status != 200) throw new Error("Failed to fetch members");
   return res.data;
@@ -271,7 +272,7 @@ export const createBulkMembers = async (data: any): Promise<any> => {
 export const searchMembers = async (searchString: any): Promise<any> => {
   try {
     const response = await axios.get(
-      `${base_url}/member/search/members?searchFor=${searchString}`,
+      `${base_url}/member/admin/search?searchFor=${searchString}`,
       { withCredentials: true }
     );
     return response.data;
@@ -368,6 +369,7 @@ export const cancelReqBooking = async (
   try {
     const response = await axios.post(
       `${base_url}/booking/cancelReqBooking?bookingFor=${bookingFor}&bookID=${bookID}${reason ? `&reason=${encodeURIComponent(reason)}` : ""}`,
+      {},
       { withCredentials: true }
     );
     console.log(response)
@@ -1924,7 +1926,7 @@ export const getAffiliatedRoomBookings = async ({
 // member bookings
 export const memberBookings = async (type: string, membership_no: string): Promise<any> => {
   try {
-    const response = await axios.get(`${base_url}/booking/member/bookings/all?type=${type}&membership_no=${membership_no}`, {
+    const response = await axios.get(`${base_url}/booking/admin/member/bookings/all?type=${type}&membership_no=${membership_no}`, {
       withCredentials: true,
     });
     return response.data;
@@ -2157,7 +2159,7 @@ export const getMemberNotifications = async (membershipNo: string, from?: string
 
 export const getBillPaymentHistory = async (membershipNo: string): Promise<any> => {
   try {
-    const response = await axios.get(`${base_url}/payment/bill-payment-history/${membershipNo}`, {
+    const response = await axios.get(`${base_url}/payment/admin/bill-payment-history/${membershipNo}`, {
       withCredentials: true,
     });
     return response.data;
@@ -2170,7 +2172,7 @@ export const getBillPaymentHistory = async (membershipNo: string): Promise<any> 
 
 export const cancelBalanceVoucher = async (id: number): Promise<any> => {
   try {
-    const response = await axios.post(`${base_url}/payment/balance/cancel/${id}`, {}, { withCredentials: true });
+    const response = await axios.post(`${base_url}/payment/admin/balance/cancel/${id}`, {}, { withCredentials: true });
     return response.data;
   } catch (error: any) {
     throw { message: error.response?.data?.message || "Error cancelling voucher", status: error.response?.status || 500 };
@@ -2185,7 +2187,7 @@ export const getAccountMembers = async (page = 1, limit = 20, search = ""): Prom
     });
     if (search) params.append("search", search);
 
-    const response = await axios.get(`${base_url}/member/get/members?${params.toString()}`, { withCredentials: true });
+    const response = await axios.get(`${base_url}/member/admin/get/members?${params.toString()}`, { withCredentials: true });
     return response.data;
   } catch (error: any) {
     throw { message: error.response?.data?.message || "Error fetching members", status: error.response?.status || 500 };
@@ -2194,7 +2196,7 @@ export const getAccountMembers = async (page = 1, limit = 20, search = ""): Prom
 
 export const getMemberVouchers = async (membershipNo: string): Promise<any> => {
   try {
-    const response = await axios.get(`${base_url}/payment/member/vouchers?membershipNo=${membershipNo}`, { withCredentials: true });
+    const response = await axios.get(`${base_url}/payment/admin/member-vouchers?membershipNo=${membershipNo}`, { withCredentials: true });
     return response.data;
   } catch (error: any) {
     throw { message: error.response?.data?.message || "Error fetching vouchers", status: error.response?.status || 500 };
@@ -2203,7 +2205,7 @@ export const getMemberVouchers = async (membershipNo: string): Promise<any> => {
 
 export const getMemberBookings = async (membershipNo: string): Promise<any> => {
   try {
-    const response = await axios.get(`${base_url}/booking/member/bookings?membershipNo=${membershipNo}`, { withCredentials: true });
+    const response = await axios.get(`${base_url}/booking/admin/member/bookings?membershipNo=${membershipNo}`, { withCredentials: true });
     return response.data;
   } catch (error: any) {
     throw { message: error.response?.data?.message || "Error fetching bookings", status: error.response?.status || 500 };
@@ -2233,7 +2235,7 @@ export const getMonthlyBill = async (membershipNo: string, month?: string, year?
     if (month) params.append("month", month);
     if (year) params.append("year", year);
 
-    const response = await axios.get(`${base_url}/accounts/bills?${params.toString()}`, { withCredentials: true });
+    const response = await axios.get(`${base_url}/accounts/admin/bills?${params.toString()}`, { withCredentials: true });
     return response.data;
   } catch (error: any) {
     throw { message: error.response?.data?.message || "Error fetching bill", status: error.response?.status || 500 };

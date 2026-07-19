@@ -1,3 +1,4 @@
+import { usePermissionAccess } from "@/hooks/use-permissions";
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -72,6 +73,7 @@ const affInitialForm: BookingForm = {
 };
 
 export default function AffiliatedClubs() {
+  const { canCreate, canUpdate, canDelete } = usePermissionAccess("Affiliated Clubs");
   const [activeTab, setActiveTab] = useState("clubs");
   const [clubDialog, setClubDialog] = useState(false);
   const [editingClub, setEditingClub] = useState<AffiliatedClub | null>(null);
@@ -894,7 +896,7 @@ export default function AffiliatedClubs() {
         {/* ─── Clubs Tab ─── */}
         <TabsContent value="clubs" className="space-y-4">
           <div className="flex justify-end">
-            <Button onClick={openCreateDialog}>
+            <Button rbacAllowed={canCreate} onClick={openCreateDialog}>
               <Plus className="h-4 w-4 mr-2" />Add Club
             </Button>
           </div>
@@ -933,12 +935,13 @@ export default function AffiliatedClubs() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
-                            <Button variant="ghost" size="icon" onClick={() => openEditDialog(club)}>
+                            <Button rbacAllowed={canUpdate} variant="ghost" size="icon" onClick={() => openEditDialog(club)}>
                               <Edit className="h-4 w-4" />
                             </Button>
                             <Button
                               variant="ghost" size="icon"
                               className="text-destructive hover:text-destructive"
+                              rbacAllowed={canDelete}
                               onClick={() => handleDeleteClub(club.id)}
                               disabled={deleteMutation.isPending}
                             >
@@ -1037,7 +1040,7 @@ export default function AffiliatedClubs() {
         <TabsContent value="bookings" className="space-y-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <h3 className="text-xl font-semibold">Affiliated Room Bookings</h3>
-            <Button onClick={() => { resetBookingForm(); setBookingDialog(true); }}>
+            <Button rbacAllowed={canCreate} onClick={() => { resetBookingForm(); setBookingDialog(true); }}>
               <Plus className="h-4 w-4" />
               New Booking
             </Button>
@@ -1057,9 +1060,9 @@ export default function AffiliatedClubs() {
               bookings={affiliatedBookings?.data || []}
               isLoading={isLoadingBookings}
               onDetail={(booking) => setDetailBooking(booking)}
-              onEdit={bookingTab !== "CLOSED" ? (booking) => handleEditBooking(booking) : undefined}
-              onCancel={bookingTab !== "CLOSED" ? (booking) => setCancelBooking(booking) : undefined}
-              onClose={bookingTab === "ACTIVE" ? (booking) => setCloseBookingTarget(booking) : undefined}
+              onEdit={canUpdate && bookingTab !== "CLOSED" ? (booking) => handleEditBooking(booking) : undefined}
+              onCancel={canDelete && bookingTab !== "CLOSED" ? (booking) => setCancelBooking(booking) : undefined}
+              onClose={canUpdate && bookingTab === "ACTIVE" ? (booking) => setCloseBookingTarget(booking) : undefined}
               onViewVouchers={(booking) => setViewVouchers(booking)}
               getPaymentBadge={getPaymentBadge}
             />
@@ -1239,7 +1242,7 @@ export default function AffiliatedClubs() {
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setClubDialog(false)} disabled={createMutation.isPending || updateMutation.isPending}>Cancel</Button>
-            <Button onClick={editingClub ? handleUpdateClub : handleCreateClub} disabled={createMutation.isPending || updateMutation.isPending}>
+            <Button rbacAllowed={editingClub ? canUpdate : canCreate} onClick={editingClub ? handleUpdateClub : handleCreateClub} disabled={createMutation.isPending || updateMutation.isPending}>
               {(createMutation.isPending || updateMutation.isPending) ? (
                 <><span className="animate-spin mr-2">⏳</span>{editingClub ? "Updating..." : "Creating..."}</>
               ) : (editingClub ? "Update" : "Create")}
@@ -1311,7 +1314,7 @@ export default function AffiliatedClubs() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => { resetBookingForm(); setBookingDialog(false); }} disabled={createBookingMutation.isPending}>Cancel</Button>
-            <Button onClick={handleCreateBooking} disabled={createBookingMutation.isPending}>
+            <Button rbacAllowed={canCreate} onClick={handleCreateBooking} disabled={createBookingMutation.isPending}>
               {createBookingMutation.isPending ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Creating...</>
               ) : (
@@ -1360,10 +1363,10 @@ export default function AffiliatedClubs() {
           {viewRequest?.status === "PENDING" && (
             <DialogFooter>
               <Button variant="outline" onClick={() => setViewRequest(null)}>Close</Button>
-              <Button variant="destructive" onClick={() => { if (viewRequest) handleRejectRequest(viewRequest.id); }} disabled={updateRequestStatusMutation.isPending}>
+              <Button rbacAllowed={canUpdate} variant="destructive" onClick={() => { if (viewRequest) handleRejectRequest(viewRequest.id); }} disabled={updateRequestStatusMutation.isPending}>
                 {updateRequestStatusMutation.isPending ? "Processing..." : "Reject"}
               </Button>
-              <Button onClick={() => { if (viewRequest) handleApproveRequest(viewRequest.id); }} disabled={updateRequestStatusMutation.isPending}>
+              <Button rbacAllowed={canUpdate} onClick={() => { if (viewRequest) handleApproveRequest(viewRequest.id); }} disabled={updateRequestStatusMutation.isPending}>
                 {updateRequestStatusMutation.isPending ? "Processing..." : "Approve"}
               </Button>
             </DialogFooter>
@@ -1436,6 +1439,7 @@ export default function AffiliatedClubs() {
                     <Button
                       variant="destructive"
                       size="sm"
+                      rbacAllowed={canUpdate}
                       onClick={() => updateBookingCancellationMutation.mutate({ bookID: String(detailBooking.id), status: "REJECTED", remarks: "Rejected by admin" })}
                       disabled={updateBookingCancellationMutation.isPending}
                     >
@@ -1443,6 +1447,7 @@ export default function AffiliatedClubs() {
                     </Button>
                     <Button
                       size="sm"
+                      rbacAllowed={canUpdate}
                       onClick={() => updateBookingCancellationMutation.mutate({ bookID: String(detailBooking.id), status: "APPROVED", remarks: "Approved by admin" })}
                       disabled={updateBookingCancellationMutation.isPending}
                     >

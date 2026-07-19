@@ -19,15 +19,15 @@ import { AuthService } from './auth.service';
 import { LoginAdminDto } from './dtos/login-admin.dto';
 import { JwtRefGuard } from 'src/common/guards/jwt-refresh.guard';
 import { JwtAccGuard } from 'src/common/guards/jwt-access.guard';
-import { RolesGuard } from 'src/common/guards/roles.guard';
-import { Roles } from 'src/common/decorators/roles.decorator';
 import { RolesEnum } from 'src/common/constants/roles.enum';
 import { OTP_MSG } from 'src/utils/messages';
 import { generateRandomNumber } from './utils/genOTP';
-import { Throttle } from '@nestjs/throttler';
 
 import { ThrottleGuard } from 'src/common/guards/throttler.guard';
 import { ThrottleEmail } from 'src/common/decorators/throttle-email.decorator';
+import { ModuleAccess } from 'src/common/decorators/module-access.decorator';
+import { MODULES } from 'src/common/constants/modules.constants';
+import { normalizePermissionMatrix } from 'src/common/utils/permissions';
 
 @Controller('auth')
 export class AuthController {
@@ -38,8 +38,7 @@ export class AuthController {
     return await this.authService.createSuperAdmin(payload);
   }
 
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN)
+  @ModuleAccess(MODULES.ADMINS)
   @Patch('update/admin')
   async updateAdmin(
     @Query() adminID: { adminID: string },
@@ -51,24 +50,28 @@ export class AuthController {
       Number(adminID?.adminID),
       payload,
       updatedBy,
+      req.user?.role,
     );
   }
 
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN)
+  @ModuleAccess(MODULES.ADMINS)
   @Post('create/admin')
   async createAdmin(@Body() payload: CreateAdminDto, @Req() req: any) {
     const createdBy = req.user?.name || 'system';
-    return await this.authService.createAdmin(payload, createdBy);
+    return await this.authService.createAdmin(payload, createdBy, req.user?.role);
   }
 
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN)
+  @ModuleAccess(MODULES.ADMINS)
   @Delete('remove/admin')
-  async removeAdmin(@Query() adminID: { adminID: string }) {
-    return await this.authService.removeAdmin(Number(adminID?.adminID));
+  async removeAdmin(@Query() adminID: { adminID: string }, @Req() req: any) {
+    return await this.authService.removeAdmin(
+      Number(adminID?.adminID),
+      req.user?.role,
+    );
   }
 
+  @UseGuards(ThrottleGuard)
+  @ThrottleEmail({ limit: 5, ttl: 60 })
   @Post('login/admin')
   async loginAdmin(
     @Body() payload: LoginAdminDto,
@@ -81,7 +84,7 @@ export class AuthController {
     const { access_token, refresh_token } =
       await this.authService.generateTokens({
         ...admin,
-        permissions: Array.isArray(admin.permissions) ? admin.permissions : [],
+        permissions: admin.permissions ?? [],
       });
     if (clientType === 'web') {
       res.cookie('access_token', access_token, {
@@ -130,7 +133,7 @@ export class AuthController {
       name: string;
       email: string;
       role: string;
-      permissions?: any[];
+      permissions?: any;
     };
     const { access_token, refresh_token } =
       await this.authService.refreshTokens({
@@ -138,7 +141,7 @@ export class AuthController {
         name,
         email,
         role,
-        permissions: Array.isArray(permissions) ? permissions : [],
+        permissions: permissions ?? [],
       });
     // for web
     if (clientType === 'web') {
@@ -171,7 +174,7 @@ export class AuthController {
         FCMToken: string | null;
         sessionToken: string | null;
         role: string | undefined;
-        permissions: any[];
+        permissions: any;
       };
     },
     @Query('fcmToken') fcmToken: string,
@@ -188,7 +191,7 @@ export class AuthController {
         id: req.user?.id,
         name: req.user?.name,
         role: req.user?.role,
-        permissions: req.user?.permissions,
+        permissions: normalizePermissionMatrix(admin.permissions),
       };
     }
 
@@ -230,15 +233,13 @@ export class AuthController {
     };
   }
 
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN)
+  @ModuleAccess(MODULES.ADMINS)
   @Get('admins')
   async getAdmins() {
     return await this.authService.getAdmins();
   }
 
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN, RolesEnum.ADMIN)
+  @ModuleAccess(MODULES.ADMIN_RESERVATIONS)
   @Get('reservations')
   async getAdminReservations(
     @Query('adminId') adminId: string,
@@ -280,6 +281,8 @@ export class AuthController {
     );
   }
 
+  @UseGuards(ThrottleGuard)
+  @ThrottleEmail({ limit: 5, ttl: 60 })
   @Post('login/member')
   async loginMember(
     @Body() payload: { memberID: string; otp: string; fcmToken: string },
@@ -327,4 +330,5 @@ export class AuthController {
       refresh_token,
     });
   }
+
 }

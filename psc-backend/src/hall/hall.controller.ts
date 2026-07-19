@@ -14,12 +14,11 @@ import {
 } from '@nestjs/common';
 import { HallDto } from './dtos/hall.dto';
 import { FilesInterceptor } from '@nestjs/platform-express';
-import { Roles } from 'src/common/decorators/roles.decorator';
-import { RolesEnum } from 'src/common/constants/roles.enum';
 import { JwtAccGuard } from 'src/common/guards/jwt-access.guard';
-import { RolesGuard } from 'src/common/guards/roles.guard';
 import { HallService } from './hall.service';
 import type { Response } from 'express';
+import { ModuleAccess } from 'src/common/decorators/module-access.decorator';
+import { MODULES } from 'src/common/constants/modules.constants';
 
 @Controller('hall')
 export class HallController {
@@ -40,8 +39,7 @@ export class HallController {
     return this.hall.getAvailHalls();
   }
 
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN)
+  @ModuleAccess(MODULES.HALLS)
   @UseInterceptors(FilesInterceptor('files', 5))
   @Post('create/hall')
   async createHall(
@@ -62,8 +60,7 @@ export class HallController {
     );
   }
 
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN)
+  @ModuleAccess(MODULES.HALLS)
   @UseInterceptors(FilesInterceptor('files', 5))
   @Patch('update/hall')
   async updateHall(
@@ -85,16 +82,14 @@ export class HallController {
     );
   }
 
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN)
+  @ModuleAccess(MODULES.HALLS)
   @Delete('delete/hall')
   async deleteHall(@Query('hallId') hallId: string) {
     return this.hall.deleteHall(Number(hallId));
   }
 
   // reserve halls
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN)
+  @ModuleAccess(MODULES.HALLS)
   @Patch('reserve/halls')
   async createHallReservation(
     @Req() req: any,

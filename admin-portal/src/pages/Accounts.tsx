@@ -1,3 +1,4 @@
+import { usePermissionAccess } from "@/hooks/use-permissions";
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -30,6 +31,7 @@ import BillUpload from "@/components/BillUpload";
 
 
 export default function Accounts() {
+  const { canCreate, canUpdate, canDelete } = usePermissionAccess("Accounts");
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedMember, setSelectedMember] = useState<any>(null);
@@ -556,6 +558,7 @@ export default function Accounts() {
                 <Button
                   className="flex-1"
                   variant="destructive"
+                  rbacAllowed={canUpdate}
                   onClick={() => handleCancelVoucher(selectedVoucher.id)}
                   disabled={isCancelling}
                 >
@@ -653,6 +656,7 @@ export default function Accounts() {
 }
 
 function MonthlyBillsTab() {
+  const { canCreate } = usePermissionAccess("Accounts");
   const [month, setMonth] = useState<string>((new Date().getMonth() + 1).toString().padStart(2, "0"));
   const [year, setYear] = useState<string>(new Date().getFullYear().toString());
   const [fetchedMonth, setFetchedMonth] = useState<string>("");
@@ -742,7 +746,7 @@ function MonthlyBillsTab() {
 
               <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
                 <DialogTrigger asChild>
-                  <Button className="flex-1 md:flex-none shadow-lg shadow-primary/10 transition-all active:scale-95">
+                  <Button rbacAllowed={canCreate} className="flex-1 md:flex-none shadow-lg shadow-primary/10 transition-all active:scale-95">
                     <Upload className="h-4 w-4 mr-2" />
                     Upload Bills
                   </Button>

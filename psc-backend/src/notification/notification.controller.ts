@@ -16,6 +16,8 @@ import { MemberStatus } from '@prisma/client';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { JwtAccGuard } from 'src/common/guards/jwt-access.guard';
 import { ContentService } from 'src/content/content.service';
+import { ModuleAccess } from 'src/common/decorators/module-access.decorator';
+import { MODULES } from 'src/common/constants/modules.constants';
 
 @Controller('notification')
 export class NotificationController {
@@ -24,7 +26,7 @@ export class NotificationController {
     private readonly contentService: ContentService,
   ) { }
 
-  @UseGuards(JwtAccGuard)
+  @ModuleAccess(MODULES.NOTIFICATIONS)
   @Post('send-msg')
   async enqueueNotification(
     @Body('payload') payload: NotificationDto,
@@ -102,7 +104,7 @@ export class NotificationController {
     }
   }
 
-  @UseGuards(JwtAccGuard)
+  @ModuleAccess(MODULES.NOTIFICATIONS)
   @Get('notifications')
   async getNotifications() {
     return this.notificationService.getNotifications();
@@ -110,11 +112,28 @@ export class NotificationController {
 
   @UseGuards(JwtAccGuard)
   @Patch('update-seen')
-  async updateSeen(@Body('notiID', ParseIntPipe) notiID: number) {
-    return this.notificationService.updateSeen(notiID);
+  async updateSeen(
+    @Body('notiID', ParseIntPipe) notiID: number,
+    @Req() req: { user: { id: string } },
+  ) {
+    return this.notificationService.updateSeen(notiID, req.user?.id);
   }
 
   @UseGuards(JwtAccGuard)
+  @Get('member-history')
+  async getOwnNotifications(@Req() req: any) {
+    const { from, to } = req.query;
+    const startDate = from ? new Date(from) : undefined;
+    const endDate = to ? new Date(to) : undefined;
+
+    return this.notificationService.getMemberNotifications(
+      req.user?.id,
+      startDate,
+      endDate,
+    );
+  }
+
+  @ModuleAccess(MODULES.NOTIFICATIONS)
   @Get('member-history/:membershipNo')
   async getMemberNotifications(
     @Param('membershipNo') membershipNo: string,

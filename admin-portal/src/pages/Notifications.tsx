@@ -1,3 +1,4 @@
+import { usePermissionAccess } from "@/hooks/use-permissions";
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,6 +53,7 @@ const editorStyles = `
 
 
 export default function Notifications() {
+  const { canCreate, canUpdate, canDelete } = usePermissionAccess("Notifications");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [notificationTitle, setNotificationTitle] = useState("");
   const [messageContent, setMessageContent] = useState("");
@@ -210,7 +212,7 @@ export default function Notifications() {
             </h3>
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
               <DialogTrigger asChild>
-                <Button className="gap-2">
+                <Button rbacAllowed={canCreate} className="gap-2">
                   <Plus className="h-4 w-4" />
                   Create Notification
                 </Button>
@@ -337,7 +339,7 @@ export default function Notifications() {
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
-                  <Button onClick={() => handleSend()} disabled={isSendDisabled}>
+                  <Button rbacAllowed={canCreate} onClick={() => handleSend()} disabled={isSendDisabled}>
                     <Send className="h-4 w-4 mr-2" />
                     {isSendingNotification ? "Sending..." : "Send Notification"}
                   </Button>
@@ -586,6 +588,7 @@ export default function Notifications() {
                 </div>
                 <Button
                   className="w-full gap-2"
+                  rbacAllowed={canCreate}
                   onClick={() => handleSend()}
                   disabled={!notificationTitle || !messageContent || isSendingNotification}
                 >

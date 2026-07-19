@@ -1,10 +1,10 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import { PhotoshootReportsService } from './photoshoot-reports.service';
-import { JwtAccGuard } from 'src/common/guards/jwt-access.guard';
-import { RolesGuard } from 'src/common/guards/roles.guard';
+import { ModuleAccess } from 'src/common/decorators/module-access.decorator';
+import { MODULES } from 'src/common/constants/modules.constants';
 
 @Controller('reports/photoshoot')
-@UseGuards(JwtAccGuard, RolesGuard)
+@ModuleAccess(MODULES.PHOTOSHOOT_REPORTS)
 export class PhotoshootReportsController {
   constructor(
     private readonly photoshootReportsService: PhotoshootReportsService,

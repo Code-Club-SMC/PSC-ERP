@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Edit, Trash2, X, Loader2, Receipt, User, Calendar, Clock, NotepadText } from "lucide-react";
+import { Plus, Edit, Trash2, X, Loader2, Receipt, User, Calendar, Clock, NotepadText, CreditCard } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import { getBookings, createBooking, updateBooking, cancelReqBooking as delBooking, getPhotoshoots, searchMembers, getVouchers, getCancelledBookings } from "../../config/apis";
+import { getBookings, createBooking, updateBooking, cancelReqBooking as delBooking, getPhotoshoots, searchMembers, getVouchers, getCancelledBookings, userWho } from "../../config/apis";
 import { MemberSearchComponent } from "@/components/MemberSearch";
 import {
   BookingSearchFilter,
@@ -27,6 +27,9 @@ import { FormInput } from "@/components/FormInputs";
 import { UnifiedDatePicker } from "@/components/UnifiedDatePicker";
 import { PhotoshootBookingDetailsCard } from "@/components/details/PhotoshootBookingDets";
 import { VouchersDialog } from "@/components/VouchersDialog";
+import { BookingPaymentSummaryCard } from "@/components/BookingPaymentSummaryCard";
+import { BookingPaymentDialog } from "@/components/BookingPaymentDialog";
+import { hasModuleAction } from "@/utils/permissions";
 
 export interface PhotoshootBooking {
   id: number;
@@ -303,6 +306,9 @@ PhotoshootPaymentSection.displayName = "PhotoshootPaymentSection";
 
 export default function PhotoshootBookings() {
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [createPaymentDialogOpen, setCreatePaymentDialogOpen] = useState(false);
+  const [editPaymentDialogOpen, setEditPaymentDialogOpen] = useState(false);
   const [editBooking, setEditBooking] = useState<PhotoshootBooking | null>(null);
   const [deleteBooking, setDeleteBooking] = useState<PhotoshootBooking | null>(null);
   const [viewVouchers, setViewVouchers] = useState<PhotoshootBooking | null>(null);
@@ -344,6 +350,20 @@ export default function PhotoshootBookings() {
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { data: currentUser } = useQuery({
+    queryKey: ["currentUser"],
+    queryFn: userWho,
+  });
+  const isSuperAdmin = currentUser?.role === "SUPER_ADMIN";
+  const canCreatePhotoshootBookings =
+    isSuperAdmin ||
+    hasModuleAction(currentUser?.permissions, "Photoshoot Bookings", "create");
+  const canUpdatePhotoshootBookings =
+    isSuperAdmin ||
+    hasModuleAction(currentUser?.permissions, "Photoshoot Bookings", "update");
+  const canDeletePhotoshootBookings =
+    isSuperAdmin ||
+    hasModuleAction(currentUser?.permissions, "Photoshoot Bookings", "delete");
   const location = useLocation();
 
   // Handle conversion from Reservation
@@ -464,6 +484,8 @@ export default function PhotoshootBookings() {
     onSuccess: () => {
       toast({ title: "Booking updated successfully" });
       queryClient.invalidateQueries({ queryKey: ["bookings", "photoshoots", "active"] });
+      setIsEditDialogOpen(false);
+      setEditPaymentDialogOpen(false);
       setEditBooking(null);
       resetForm();
     },
@@ -566,15 +588,91 @@ export default function PhotoshootBookings() {
 
   const handleCloseAddModal = () => {
     setIsAddOpen(false);
+    setCreatePaymentDialogOpen(false);
     resetForm();
   };
 
   const handleCloseEditModal = () => {
+    setIsEditDialogOpen(false);
+    setEditPaymentDialogOpen(false);
     setEditBooking(null);
     resetForm();
   };
 
+  const handlePaymentFieldChange = (field: string, value: any) => {
+    if (field === "paymentStatus") {
+      setPaymentStatus(value);
+      if (value === "PAID") {
+        setPaidAmount(totalPrice);
+      } else if (value === "UNPAID") {
+        setPaidAmount(0);
+      } else if (value === "HALF_PAID" && paidAmount === 0) {
+        setPaidAmount(totalPrice / 2);
+      }
+      return;
+    }
+    if (field === "paidAmount") {
+      setPaidAmount(value);
+      return;
+    }
+    if (field === "paymentMode") {
+      setPPaymentMode(value);
+      return;
+    }
+    if (field === "card_number") {
+      setPCardNumber(value);
+      return;
+    }
+    if (field === "check_number") {
+      setPCheckNumber(value);
+      return;
+    }
+    if (field === "bank_name") {
+      setPBankName(value);
+      return;
+    }
+    if (field === "transaction_id") {
+      setPTransactionId(value);
+      return;
+    }
+    if (field === "paid_at") {
+      setPPaidAt(value);
+    }
+  };
+
+  const buildPhotoshootUpdatePayload = (
+    sourceBooking: PhotoshootBooking | null = editBooking
+  ) => {
+    if (!sourceBooking) return null;
+    const firstSlot = bookingDetails.length > 0 ? bookingDetails[0] : null;
+
+    return {
+      category: "Photoshoot",
+      id: sourceBooking.id,
+      membershipNo: sourceBooking.member.Membership_No,
+      entityId: selectedPhotoshootId || sourceBooking.photoshootId.toString(),
+      checkIn: firstSlot ? firstSlot.date : new Date(sourceBooking.bookingDate).toISOString().split("T")[0],
+      timeSlot: firstSlot ? firstSlot.timeSlot : undefined,
+      bookingDetails,
+      totalPrice: totalPrice.toString(),
+      paymentStatus,
+      pricingType,
+      paidAmount: paymentStatus === "HALF_PAID" ? paidAmount : (paymentStatus === "PAID" ? totalPrice : 0),
+      pendingAmount: totalPrice - (paymentStatus === "HALF_PAID" ? paidAmount : (paymentStatus === "PAID" ? totalPrice : 0)),
+      paymentMode: pPaymentMode,
+      card_number: pCardNumber,
+      check_number: pCheckNumber,
+      bank_name: pBankName,
+      transaction_id: pTransactionId,
+      paid_at: pPaidAt,
+      paidBy: guestSec.paidBy,
+      guestName: guestSec.guestName,
+      guestContact: guestSec.guestContact?.toString(),
+    };
+  };
+
   const handleCreate = () => {
+    if (!canCreatePhotoshootBookings) return;
     if (!selectedMember || !selectedPhotoshootId || bookingDetails.length === 0) {
       toast({ title: "Missing fields", description: "Please fill all required fields", variant: "destructive" });
       return;
@@ -611,36 +709,33 @@ export default function PhotoshootBookings() {
   };
 
   const handleUpdate = () => {
-    if (!editBooking) return;
-
-    // Use first slot or existing
-    const firstSlot = bookingDetails.length > 0 ? bookingDetails[0] : null;
-
-    const payload = {
-      category: "Photoshoot",
-      id: editBooking.id,
-      membershipNo: editBooking.member.Membership_No,
-      entityId: selectedPhotoshootId || editBooking.photoshootId.toString(),
-      checkIn: firstSlot ? firstSlot.date : new Date(editBooking.bookingDate).toISOString().split('T')[0],
-      timeSlot: firstSlot ? firstSlot.timeSlot : undefined,
-      bookingDetails,
-      totalPrice: totalPrice.toString(),
-      paymentStatus,
-      pricingType,
-      paidAmount: paymentStatus === "HALF_PAID" ? paidAmount : (paymentStatus === "PAID" ? totalPrice : 0),
-      pendingAmount: totalPrice - (paymentStatus === "HALF_PAID" ? paidAmount : (paymentStatus === "PAID" ? totalPrice : 0)),
-      paymentMode: pPaymentMode,
-      card_number: pCardNumber,
-      check_number: pCheckNumber,
-      bank_name: pBankName,
-      transaction_id: pTransactionId,
-      paid_at: pPaidAt,
-      paidBy: guestSec.paidBy,
-      guestName: guestSec.guestName,
-      guestContact: guestSec.guestContact?.toString(),
-    };
-
+    if (!canUpdatePhotoshootBookings) return;
+    const payload = buildPhotoshootUpdatePayload();
+    if (!payload) return;
     updateMutation.mutate(payload);
+  };
+
+  const handleSaveEditPayment = () => {
+    const payload = buildPhotoshootUpdatePayload();
+    if (!payload) {
+      toast({
+        title: "Booking details are not ready yet",
+        description: "Please try again in a moment",
+        variant: "destructive",
+      });
+      return;
+    }
+    updateMutation.mutate(payload);
+  };
+
+  const openEditDialog = (booking: PhotoshootBooking) => {
+    setEditBooking(booking);
+    setIsEditDialogOpen(true);
+  };
+
+  const openEditPaymentDialog = (booking: PhotoshootBooking) => {
+    setEditBooking(booking);
+    setEditPaymentDialogOpen(true);
   };
 
   // Populate edit form
@@ -751,7 +846,7 @@ export default function PhotoshootBookings() {
             if (!open) handleCloseAddModal();
           }}>
             <DialogTrigger asChild>
-              <Button className="gap-2">
+              <Button className="gap-2" rbacAllowed={canCreatePhotoshootBookings}>
                 <Plus className="h-4 w-4" />
                 New Booking
               </Button>
@@ -968,52 +1063,23 @@ export default function PhotoshootBookings() {
                   <Input type="text" className="mt-2 font-bold text-lg" value={`PKR ${totalPrice.toLocaleString()}`} disabled />
                 </div> */}
 
-                <PhotoshootPaymentSection
-                  form={{
-                    paymentStatus: paymentStatus,
-                    totalPrice: totalPrice,
-                    paidAmount: paidAmount,
-                    pendingAmount: totalPrice - paidAmount,
-                    paymentMode: pPaymentMode,
-                    card_number: pCardNumber,
-                    check_number: pCheckNumber,
-                    bank_name: pBankName,
-                    transaction_id: pTransactionId,
-                    paid_at: pPaidAt
-                  } as any}
-                  onChange={(field, value) => {
-                    if (field === "paymentStatus") {
-                      setPaymentStatus(value);
-                      if (value === "PAID") {
-                        setPaidAmount(totalPrice);
-                      } else if (value === "UNPAID") {
-                        setPaidAmount(0);
-                      } else if (value === "HALF_PAID") {
-                        if (paidAmount === 0) {
-                          setPaidAmount(totalPrice / 2);
-                        }
-                      }
-                    } else if (field === "paidAmount") {
-                      setPaidAmount(value);
-                    } else if (field === "paymentMode") {
-                      setPPaymentMode(value);
-                    } else if (field === "card_number") {
-                      setPCardNumber(value);
-                    } else if (field === "check_number") {
-                      setPCheckNumber(value);
-                    } else if (field === "bank_name") {
-                      setPBankName(value);
-                    } else if (field === "transaction_id") {
-                      setPTransactionId(value);
-                    } else if (field === "paid_at") {
-                      setPPaidAt(value);
-                    }
-                  }}
+                <BookingPaymentSummaryCard
+                  paymentStatus={paymentStatus}
+                  paidAmount={Number(paidAmount) || 0}
+                  pendingAmount={Number(totalPrice - paidAmount) || 0}
+                  paymentMode={pPaymentMode}
+                  transactionId={pTransactionId}
+                  onRecordPayment={
+                    canCreatePhotoshootBookings ? () => setCreatePaymentDialogOpen(true) : undefined
+                  }
                 />
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={handleCloseAddModal}>Cancel</Button>
-                <Button onClick={handleCreate} disabled={createMutation.isPending}>
+                <Button
+                  onClick={handleCreate}
+                  disabled={!canCreatePhotoshootBookings || createMutation.isPending}
+                >
                   {createMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Create"}
                 </Button>
               </DialogFooter>
@@ -1119,14 +1185,26 @@ export default function PhotoshootBookings() {
                               >
                                 <NotepadText className="h-4 w-4" />
                               </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setEditBooking(booking)}
-                                title="Edit Booking"
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
+                              {canUpdatePhotoshootBookings && (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => openEditDialog(booking)}
+                                    title="Edit Booking"
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => openEditPaymentDialog(booking)}
+                                    title="Record Payment"
+                                  >
+                                    <CreditCard className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -1135,15 +1213,17 @@ export default function PhotoshootBookings() {
                               >
                                 <Receipt className="h-4 w-4" />
                               </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="text-destructive"
-                                onClick={() => setDeleteBooking(booking)}
-                                title="Delete Booking"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                              {canDeletePhotoshootBookings && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-destructive"
+                                  onClick={() => setDeleteBooking(booking)}
+                                  title="Cancel Booking"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -1250,7 +1330,7 @@ export default function PhotoshootBookings() {
         </TabsContent>
       </Tabs>
       <div ref={lastElementRef} className="h-10" />
-      < Dialog open={!!editBooking} onOpenChange={(open) => {
+      < Dialog open={isEditDialogOpen && !!editBooking} onOpenChange={(open) => {
         if (!open) handleCloseEditModal();
       }}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -1487,58 +1567,79 @@ export default function PhotoshootBookings() {
               </div>
             </div>}
 
-            {/* Accounting Summary Section for Edit */}
-            <PhotoshootPaymentSection
-              onChange={(field, value) => {
-                if (field === "paymentStatus") {
-                  setPaymentStatus(value);
-                  if (value === "PAID") {
-                    setPaidAmount(totalPrice);
-                  } else if (value === "UNPAID") {
-                    setPaidAmount(0);
-                  } else if (value === "HALF_PAID") {
-                    if (paidAmount === 0) {
-                      setPaidAmount(totalPrice / 2);
-                    }
-                  }
-                } else if (field === "paidAmount") {
-                  setPaidAmount(value);
-                } else if (field === "paymentMode") {
-                  setPPaymentMode(value);
-                } else if (field === "card_number") {
-                  setPCardNumber(value);
-                } else if (field === "check_number") {
-                  setPCheckNumber(value);
-                } else if (field === "bank_name") {
-                  setPBankName(value);
-                } else if (field === "transaction_id") {
-                  setPTransactionId(value);
-                } else if (field === "paid_at") {
-                  setPPaidAt(value);
-                }
-              }}
-              form={{
-                paymentStatus: paymentStatus,
-                totalPrice: totalPrice,
-                paidAmount: paidAmount,
-                pendingAmount: totalPrice - paidAmount,
-                paymentMode: pPaymentMode,
-                card_number: pCardNumber,
-                check_number: pCheckNumber,
-                bank_name: pBankName,
-                transaction_id: pTransactionId,
-                paid_at: pPaidAt
-              } as any}
+            {/* Payment Summary */}
+            <BookingPaymentSummaryCard
+              paymentStatus={paymentStatus}
+              paidAmount={Number(paidAmount) || 0}
+              pendingAmount={Number(totalPrice - paidAmount) || 0}
+              paymentMode={pPaymentMode}
+              transactionId={pTransactionId}
+              onRecordPayment={
+                canUpdatePhotoshootBookings ? () => setEditPaymentDialogOpen(true) : undefined
+              }
             />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={handleCloseEditModal}>Cancel</Button>
-            <Button onClick={handleUpdate} disabled={updateMutation.isPending}>
+            <Button
+              onClick={handleUpdate}
+              disabled={!canUpdatePhotoshootBookings || updateMutation.isPending}
+            >
               {updateMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Update"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <BookingPaymentDialog
+        open={createPaymentDialogOpen}
+        onOpenChange={setCreatePaymentDialogOpen}
+        title="Record Payment (New Photoshoot Booking)"
+        description="Apply payment and transaction details before creating the booking."
+        onSave={() => setCreatePaymentDialogOpen(false)}
+        saveLabel="Use Payment Details"
+      >
+        <PhotoshootPaymentSection
+          form={{
+            paymentStatus,
+            totalPrice,
+            paidAmount,
+            pendingAmount: totalPrice - paidAmount,
+            paymentMode: pPaymentMode,
+            card_number: pCardNumber,
+            check_number: pCheckNumber,
+            bank_name: pBankName,
+            transaction_id: pTransactionId,
+            paid_at: pPaidAt
+          } as any}
+          onChange={handlePaymentFieldChange}
+        />
+      </BookingPaymentDialog>
+
+      <BookingPaymentDialog
+        open={editPaymentDialogOpen && !!editBooking}
+        onOpenChange={(open) => setEditPaymentDialogOpen(open)}
+        title={`Record Payment (Photoshoot Booking #${editBooking?.id ?? ""})`}
+        description="Save payment/transaction updates without using the edit form."
+        onSave={handleSaveEditPayment}
+        isSaving={updateMutation.isPending}
+      >
+        <PhotoshootPaymentSection
+          form={{
+            paymentStatus,
+            totalPrice,
+            paidAmount,
+            pendingAmount: totalPrice - paidAmount,
+            paymentMode: pPaymentMode,
+            card_number: pCardNumber,
+            check_number: pCheckNumber,
+            bank_name: pBankName,
+            transaction_id: pTransactionId,
+            paid_at: pPaidAt
+          } as any}
+          onChange={handlePaymentFieldChange}
+        />
+      </BookingPaymentDialog>
 
       {/* booking details */}
       <Dialog open={openDetails} onOpenChange={setOpenDetails}>
@@ -1570,7 +1671,12 @@ export default function PhotoshootBookings() {
           <p className="py-4">Are you sure you want to delete this booking?</p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteBooking(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={() => deleteBooking && deleteMutation.mutate({ bookID: deleteBooking.id, reason: "Cancelled by Admin" })} disabled={deleteMutation.isPending}>
+            <Button
+              variant="destructive"
+              rbacAllowed={canDeletePhotoshootBookings}
+              onClick={() => deleteBooking && deleteMutation.mutate({ bookID: deleteBooking.id, reason: "Cancelled by Admin" })}
+              disabled={!canDeletePhotoshootBookings || deleteMutation.isPending}
+            >
               {deleteMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Delete"}
             </Button>
           </DialogFooter>

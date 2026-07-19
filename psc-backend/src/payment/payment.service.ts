@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   HttpException,
   Injectable,
   InternalServerErrorException,
@@ -329,7 +330,7 @@ export class PaymentService {
         // Check if it's the same transaction (idempotency)
         if (voucher.transaction_id === paymentData.tran_auth_id) {
           return {
-            response_Code: '03',
+            response_Code: '00',
             Identification_parameter:
               member?.Email || (voucher as any).consumer_number,
             reserved: 'Duplicate ignored',
@@ -339,6 +340,18 @@ export class PaymentService {
           response_Code: '03',
           Identification_parameter: '',
           reserved: 'Already paid',
+        };
+      }
+
+      const paidAmount = this.parseKuickpayAmountToRupees(
+        paymentData.transaction_amount,
+      );
+      const expectedAmount = Number(voucher.amount);
+      if (paidAmount === null || Math.abs(paidAmount - expectedAmount) > 0.01) {
+        return {
+          response_Code: '01',
+          Identification_parameter: '',
+          reserved: 'Amount mismatch',
         };
       }
 
@@ -619,103 +632,190 @@ export class PaymentService {
     return new Date(year, month, day);
   }
 
+  private parseKuickpayAmountToRupees(rawAmount: string): number | null {
+    if (!rawAmount) return null;
+
+    const normalized = String(rawAmount).trim();
+    if (!normalized) return null;
+
+    if (normalized.includes('.')) {
+      const decimalValue = Number(normalized);
+      return Number.isFinite(decimalValue) ? decimalValue : null;
+    }
+
+    const sign = normalized.startsWith('-') ? -1 : 1;
+    const digits = normalized.replace(/[^\d]/g, '');
+    if (!digits) return null;
+
+    const amountInPaisa = Number(digits);
+    if (!Number.isFinite(amountInPaisa)) return null;
+
+    return sign * amountInPaisa / 100;
+  }
+
 
   async confirmBooking(type: string, id: number) {
-    const bookingType = type.toUpperCase() as BookingType;
+    const bookingType = type.toUpperCase();
+    if (!id || Number.isNaN(Number(id))) {
+      throw new BadRequestException('Booking id is required');
+    }
 
     return await this.prismaService.$transaction(async (prisma) => {
       let booking: any;
-      let membershipNo: string = '';
-      let totalAmount: number = 0;
+      let membershipNo = '';
+      let totalAmount = 0;
 
-      // 1. Fetch booking and confirm it
       if (bookingType === 'ROOM') {
-        booking = await prisma.roomBooking.update({
+        booking = await prisma.roomBooking.findUnique({
           where: { id },
-          data: { isConfirmed: true, paymentStatus: 'PAID' },
           include: { rooms: true },
         });
-        membershipNo = booking.Membership_No;
-        totalAmount = Number(booking.totalPrice);
+        membershipNo = booking?.Membership_No || '';
+        totalAmount = Number(booking?.totalPrice || 0);
       } else if (bookingType === 'HALL') {
-        booking = await prisma.hallBooking.update({
+        booking = await prisma.hallBooking.findUnique({
           where: { id },
-          data: { isConfirmed: true, paymentStatus: 'PAID' },
           include: { member: true },
         });
-        membershipNo = booking.member.Membership_No;
-        totalAmount = Number(booking.totalPrice);
+        membershipNo = booking?.member?.Membership_No || '';
+        totalAmount = Number(booking?.totalPrice || 0);
       } else if (bookingType === 'LAWN') {
-        booking = await prisma.lawnBooking.update({
+        booking = await prisma.lawnBooking.findUnique({
           where: { id },
-          data: { isConfirmed: true, paymentStatus: 'PAID' },
           include: { member: true },
         });
-        membershipNo = booking.member.Membership_No;
-        totalAmount = Number(booking.totalPrice);
+        membershipNo = booking?.member?.Membership_No || '';
+        totalAmount = Number(booking?.totalPrice || 0);
       } else if (bookingType === 'PHOTOSHOOT') {
-        booking = await prisma.photoshootBooking.update({
+        booking = await prisma.photoshootBooking.findUnique({
           where: { id },
-          data: { isConfirmed: true, paymentStatus: 'PAID' },
           include: { member: true },
         });
-        membershipNo = booking.member.Membership_No;
-        totalAmount = Number(booking.totalPrice);
+        membershipNo = booking?.member?.Membership_No || '';
+        totalAmount = Number(booking?.totalPrice || 0);
+      } else if (bookingType === 'AFF_ROOM') {
+        booking = await prisma.affClubBooking.findUnique({
+          where: { id },
+          include: { rooms: true },
+        });
+        membershipNo = booking?.affiliatedMembershipNo || '';
+        totalAmount = Number(booking?.totalPrice || 0);
+      } else {
+        throw new BadRequestException(`Unsupported booking type: ${type}`);
       }
-      // Add more types as needed...
 
-      // 2. Update Voucher
-      await prisma.paymentVoucher.updateMany({
+      if (!booking) {
+        throw new NotFoundException('Booking not found');
+      }
+
+      const pendingVouchersCount = await prisma.paymentVoucher.count({
         where: {
           booking_id: id,
-          booking_type: bookingType,
+          booking_type: bookingType as BookingType,
+          status: VoucherStatus.PENDING,
+        },
+      });
+
+      if (
+        booking.isConfirmed &&
+        booking.paymentStatus === PaymentStatus.PAID &&
+        pendingVouchersCount === 0
+      ) {
+        return { success: true, idempotent: true, booking };
+      }
+
+      const wasConfirmed = Boolean(booking.isConfirmed);
+      const updateData: any = {};
+      if (!wasConfirmed) updateData.isConfirmed = true;
+      if (booking.paymentStatus !== PaymentStatus.PAID) {
+        updateData.paymentStatus = PaymentStatus.PAID;
+      }
+
+      if (Object.keys(updateData).length > 0) {
+        if (bookingType === 'ROOM') {
+          booking = await prisma.roomBooking.update({
+            where: { id },
+            data: updateData,
+            include: { rooms: true },
+          });
+        } else if (bookingType === 'HALL') {
+          booking = await prisma.hallBooking.update({
+            where: { id },
+            data: updateData,
+            include: { member: true },
+          });
+        } else if (bookingType === 'LAWN') {
+          booking = await prisma.lawnBooking.update({
+            where: { id },
+            data: updateData,
+            include: { member: true },
+          });
+        } else if (bookingType === 'PHOTOSHOOT') {
+          booking = await prisma.photoshootBooking.update({
+            where: { id },
+            data: updateData,
+            include: { member: true },
+          });
+        } else if (bookingType === 'AFF_ROOM') {
+          booking = await prisma.affClubBooking.update({
+            where: { id },
+            data: updateData,
+            include: { rooms: true },
+          });
+        }
+      }
+
+      const updatedVouchers = await prisma.paymentVoucher.updateMany({
+        where: {
+          booking_id: id,
+          booking_type: bookingType as BookingType,
           status: VoucherStatus.PENDING,
         },
         data: { status: VoucherStatus.CONFIRMED },
       });
 
-      // 3. Clear Holdings
-      if (bookingType === 'ROOM') {
-        const roomIds = booking.rooms.map((r) => r.roomId);
-        await prisma.roomHoldings.deleteMany({
-          where: { roomId: { in: roomIds }, holdBy: membershipNo },
-        });
+      if (bookingType === 'ROOM' || bookingType === 'AFF_ROOM') {
+        if (membershipNo) {
+          const roomIds = booking.rooms.map((r: any) => r.roomId);
+          await prisma.roomHoldings.deleteMany({
+            where: { roomId: { in: roomIds }, holdBy: membershipNo },
+          });
+        }
       } else if (bookingType === 'HALL') {
-        await prisma.hallHoldings.deleteMany({
-          where: { hallId: booking.hallId, holdBy: membershipNo },
-        });
+        if (membershipNo) {
+          await prisma.hallHoldings.deleteMany({
+            where: { hallId: booking.hallId, holdBy: membershipNo },
+          });
+        }
       } else if (bookingType === 'LAWN') {
-        await prisma.lawnHoldings.deleteMany({
-          where: { lawnId: booking.lawnId, holdBy: membershipNo },
-        });
+        if (membershipNo) {
+          await prisma.lawnHoldings.deleteMany({
+            where: { lawnId: booking.lawnId, holdBy: membershipNo },
+          });
+        }
       }
 
-      // 4. Update Member Ledger (Mimicking ledger updates in BookingService)
-      // Note: This logic should ideally be shared or called from BookingService
-      const member = await prisma.member.findUnique({
-        where: { Membership_No: membershipNo },
-      });
-
-      if (member) {
-        await prisma.member.update({
+      const shouldUpdateLedger =
+        totalAmount > 0 && (!wasConfirmed || updatedVouchers.count > 0);
+      if (membershipNo && shouldUpdateLedger) {
+        const member = await prisma.member.findUnique({
           where: { Membership_No: membershipNo },
-          data: {
-            totalBookings: { increment: 1 },
-            lastBookingDate: getPakistanDate(),
-            bookingAmountPaid: { increment: Math.round(totalAmount) },
-            bookingBalance: { increment: Math.round(totalAmount) },
-            // Since it's PAID, we don't increment bookingAmountDue
-          },
         });
+
+        if (member) {
+          await prisma.member.update({
+            where: { Membership_No: membershipNo },
+            data: {
+              totalBookings: { increment: 1 },
+              lastBookingDate: getPakistanDate(),
+              bookingAmountPaid: { increment: Math.round(totalAmount) },
+              bookingBalance: { increment: Math.round(totalAmount) },
+            },
+          });
+        }
       }
 
-      if (!membershipNo || totalAmount === 0) {
-        throw new BadRequestException(
-          `Unsupported or invalid booking type: ${type}`,
-        );
-      }
-
-      return { success: true, booking };
+      return { success: true, idempotent: false, booking };
     });
   }
 
@@ -2027,12 +2127,20 @@ export class PaymentService {
     });
   }
 
-  async cancelBalanceVoucher(id: number) {
+  async cancelBalanceVoucher(id: number, requesterMembershipNo?: string) {
     const voucher = await this.prismaService.paymentVoucher.findUnique({
       where: { id },
     });
 
     if (!voucher) throw new NotFoundException('Voucher not found');
+    if (
+      requesterMembershipNo &&
+      voucher.membership_no !== requesterMembershipNo
+    ) {
+      throw new ForbiddenException(
+        'You can only cancel your own pending balance vouchers',
+      );
+    }
     if (voucher.remarks !== 'Balance') {
       throw new BadRequestException('Only balance vouchers can be cancelled via this API');
     }

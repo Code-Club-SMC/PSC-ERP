@@ -1,13 +1,10 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import { SearchService } from './search.service';
-import { JwtAccGuard } from 'src/common/guards/jwt-access.guard';
-import { RolesGuard } from 'src/common/guards/roles.guard';
-import { Roles } from 'src/common/decorators/roles.decorator';
-import { RolesEnum } from 'src/common/constants/roles.enum';
+import { ModuleAccess } from 'src/common/decorators/module-access.decorator';
+import { MODULES } from 'src/common/constants/modules.constants';
 
 @Controller('search')
-@UseGuards(JwtAccGuard, RolesGuard)
-@Roles(RolesEnum.SUPER_ADMIN, RolesEnum.ADMIN)
+@ModuleAccess(MODULES.SEARCH)
 export class SearchController {
     constructor(private readonly searchService: SearchService) { }
 

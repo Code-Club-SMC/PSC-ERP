@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { RoomBookingReportDto, RoomCancellationReportDto, RoomDailyCheckoutDto, RoomMonthlyBillsDto, RoomMonthlyCheckoutDto, RoomSalesReportDto } from './dtos/room-report.dto';
+import { parsePakistanDate, toPakistanDateKey } from 'src/utils/time';
 
 @Injectable()
 export class RoomReportsService {
@@ -36,14 +37,15 @@ export class RoomReportsService {
     let toDateParsed: Date | undefined;
 
     if (fromDate) {
-      fromDateParsed = new Date(fromDate);
+      fromDateParsed = parsePakistanDate(fromDate);
+      fromDateParsed.setHours(0, 0, 0, 0);
       if (isNaN(fromDateParsed.getTime())) {
         throw new BadRequestException(`Invalid fromDate format: ${fromDate}`);
       }
     }
 
     if (toDate) {
-      toDateParsed = new Date(toDate);
+      toDateParsed = parsePakistanDate(toDate);
       if (isNaN(toDateParsed.getTime())) {
         throw new BadRequestException(`Invalid toDate format: ${toDate}`);
       }
@@ -149,12 +151,13 @@ export class RoomReportsService {
     if (!fromDate) throw new BadRequestException('fromDate is required');
     if (!toDate) throw new BadRequestException('toDate is required');
 
-    const fromDateParsed = new Date(fromDate);
+    const fromDateParsed = parsePakistanDate(fromDate);
+    fromDateParsed.setHours(0, 0, 0, 0);
     if (isNaN(fromDateParsed.getTime())) {
       throw new BadRequestException(`Invalid fromDate format: ${fromDate}`);
     }
 
-    const toDateParsed = new Date(toDate);
+    const toDateParsed = parsePakistanDate(toDate);
     if (isNaN(toDateParsed.getTime())) {
       throw new BadRequestException(`Invalid toDate format: ${toDate}`);
     }
@@ -340,8 +343,8 @@ export class RoomReportsService {
       return {
         roomNumber,
         guestName,
-        from: checkIn.toISOString().split('T')[0],
-        to: checkOut.toISOString().split('T')[0],
+        from: toPakistanDateKey(checkIn),
+        to: toPakistanDateKey(checkOut),
         days,
         rent,
         mattress,
@@ -369,12 +372,13 @@ export class RoomReportsService {
     if (!fromDate) throw new BadRequestException('fromDate is required');
     if (!toDate) throw new BadRequestException('toDate is required');
 
-    const fromDateParsed = new Date(fromDate);
+    const fromDateParsed = parsePakistanDate(fromDate);
+    fromDateParsed.setHours(0, 0, 0, 0);
     if (isNaN(fromDateParsed.getTime())) {
       throw new BadRequestException(`Invalid fromDate format: ${fromDate}`);
     }
 
-    const toDateParsed = new Date(toDate);
+    const toDateParsed = parsePakistanDate(toDate);
     if (isNaN(toDateParsed.getTime())) {
       throw new BadRequestException(`Invalid toDate format: ${toDate}`);
     }
@@ -400,7 +404,7 @@ export class RoomReportsService {
     >();
 
     for (const booking of bookings) {
-      const dateKey = new Date(booking.checkOut).toISOString().split('T')[0];
+      const dateKey = toPakistanDateKey(booking.checkOut);
 
       const extraCharges: { head: string; amount: number }[] =
         Array.isArray(booking.extraCharges) ? (booking.extraCharges as any[]) : [];
@@ -457,12 +461,13 @@ export class RoomReportsService {
     if (!fromDate) throw new BadRequestException('fromDate is required');
     if (!toDate) throw new BadRequestException('toDate is required');
 
-    const fromDateParsed = new Date(fromDate);
+    const fromDateParsed = parsePakistanDate(fromDate);
+    fromDateParsed.setHours(0, 0, 0, 0);
     if (isNaN(fromDateParsed.getTime())) {
       throw new BadRequestException(`Invalid fromDate format: ${fromDate}`);
     }
 
-    const toDateParsed = new Date(toDate);
+    const toDateParsed = parsePakistanDate(toDate);
     if (isNaN(toDateParsed.getTime())) {
       throw new BadRequestException(`Invalid toDate format: ${toDate}`);
     }
@@ -532,12 +537,13 @@ export class RoomReportsService {
     if (!fromDate) throw new BadRequestException('fromDate is required');
     if (!toDate) throw new BadRequestException('toDate is required');
 
-    const fromDateParsed = new Date(fromDate);
+    const fromDateParsed = parsePakistanDate(fromDate);
+    fromDateParsed.setHours(0, 0, 0, 0);
     if (isNaN(fromDateParsed.getTime())) {
       throw new BadRequestException(`Invalid fromDate format: ${fromDate}`);
     }
 
-    const toDateParsed = new Date(toDate);
+    const toDateParsed = parsePakistanDate(toDate);
     if (isNaN(toDateParsed.getTime())) {
       throw new BadRequestException(`Invalid toDate format: ${toDate}`);
     }
@@ -628,8 +634,8 @@ export class RoomReportsService {
         memberNumber,
         guestName,
         roomNumber,
-        from: checkIn.toISOString().split('T')[0],
-        to: checkOut.toISOString().split('T')[0],
+        from: toPakistanDateKey(checkIn),
+        to: toPakistanDateKey(checkOut),
         rent,
         gst,
         food,
@@ -672,8 +678,8 @@ export class RoomReportsService {
         memberNumber: b.affiliatedMembershipNo ?? '',
         guestName,
         roomNumber,
-        from: checkIn.toISOString().split('T')[0],
-        to: checkOut.toISOString().split('T')[0],
+        from: toPakistanDateKey(checkIn),
+        to: toPakistanDateKey(checkOut),
         rent,
         gst,
         food,
@@ -730,8 +736,8 @@ export class RoomReportsService {
     dto.memberNumber = booking.Membership_No;
     dto.roomNumber = roomNumber;
     dto.roomType = roomType;
-    dto.checkIn = checkIn.toISOString().split('T')[0];
-    dto.checkOut = checkOut.toISOString().split('T')[0];
+    dto.checkIn = toPakistanDateKey(checkIn);
+    dto.checkOut = toPakistanDateKey(checkOut);
     dto.days = days;
     dto.rent = Number(booking.totalPrice) - food - gst - serviceCharge - mattress - laundry;
     dto.gst = gst;

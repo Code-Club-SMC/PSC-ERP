@@ -25,7 +25,8 @@ import {
   UpdateAffiliatedRoomBookingDto,
 } from './dtos/affiliation.dto';
 import { JwtAccGuard } from 'src/common/guards/jwt-access.guard';
-import { PermissionsGuard } from 'src/common/guards/permission.guard';
+import { ModuleAccess } from 'src/common/decorators/module-access.decorator';
+import { MODULES } from 'src/common/constants/modules.constants';
 
 @Controller('affiliation')
 export class AffiliationController {
@@ -36,25 +37,25 @@ export class AffiliationController {
 
   // -------------------- AFFILIATED CLUBS --------------------
 
-  @UseGuards(JwtAccGuard)
+  @ModuleAccess(MODULES.AFFILIATED_CLUBS)
   @Get('clubs')
   async getAffiliatedClubs() {
     return await this.affiliationService.getAffiliatedClubs();
   }
 
-  @UseGuards(JwtAccGuard)
+  @ModuleAccess(MODULES.AFFILIATED_CLUBS)
   @Get('clubs/active')
   async getAffiliatedClubsActive() {
     return await this.affiliationService.getAffiliatedClubsActive();
   }
 
-  @UseGuards(JwtAccGuard)
+  @ModuleAccess(MODULES.AFFILIATED_CLUBS)
   @Get('clubs/:id')
   async getAffiliatedClubById(@Param('id') id: string) {
     return await this.affiliationService.getAffiliatedClubById(Number(id));
   }
 
-  @UseGuards(JwtAccGuard)
+  @ModuleAccess(MODULES.AFFILIATED_CLUBS)
   @Post('clubs')
   @UseInterceptors(FileInterceptor('image'))
   async createAffiliatedClub(
@@ -70,7 +71,7 @@ export class AffiliationController {
     );
   }
 
-  @UseGuards(JwtAccGuard)
+  @ModuleAccess(MODULES.AFFILIATED_CLUBS)
   @Put('clubs')
   @UseInterceptors(FileInterceptor('image'))
   async updateAffiliatedClub(
@@ -86,7 +87,7 @@ export class AffiliationController {
     );
   }
 
-  @UseGuards(JwtAccGuard)
+  @ModuleAccess(MODULES.AFFILIATED_CLUBS)
   @Delete('clubs/:id')
   async deleteAffiliatedClub(@Param('id') id: string) {
     return await this.affiliationService.deleteAffiliatedClub(Number(id));
@@ -94,6 +95,7 @@ export class AffiliationController {
 
   // -------------------- AFFILIATED CLUB REQUESTS --------------------
 
+  @ModuleAccess(MODULES.AFFILIATED_CLUBS)
   @Get('requests')
   async getAffiliatedClubRequests(
     @Query('from') from?: string,
@@ -107,6 +109,7 @@ export class AffiliationController {
     );
   }
 
+  @ModuleAccess(MODULES.AFFILIATED_CLUBS)
   @Get('requests/:id')
   async getRequestById(@Param('id') id: string) {
     return await this.affiliationService.getRequestById(Number(id));
@@ -114,16 +117,15 @@ export class AffiliationController {
 
   @UseGuards(JwtAccGuard)
   @Post('requests')
-  async createRequest(@Body() body: any, @Req() req: any) {
-    console.log(req.body)
-    const sender = req.body?.membershipNo;
+  async createRequest(@Body() body: any, @Req() req: { user: { id: string } }) {
+    const sender = req.user?.id;
     return await this.affiliationService.createRequest(
       { ...body, membershipNo: sender },
       sender,
     );
   }
 
-  @UseGuards(JwtAccGuard)
+  @ModuleAccess(MODULES.AFFILIATED_CLUBS)
   @Get('booking-stats')
   async getAffiliatedBookingStats(
     @Query('from') from?: string,
@@ -132,7 +134,7 @@ export class AffiliationController {
     return await this.affiliationService.getAffiliatedBookingStats(from, to);
   }
 
-  @UseGuards(JwtAccGuard)
+  @ModuleAccess(MODULES.AFFILIATED_CLUBS)
   @Get('bookings')
   async getRoomBookings(
     @Query('page') page?: string,
@@ -148,14 +150,14 @@ export class AffiliationController {
     );
   }
 
-  @UseGuards(JwtAccGuard)
+  @ModuleAccess(MODULES.AFFILIATED_CLUBS)
   @Post('booking')
   async createRoomBooking(@Body() body: AffiliatedRoomBookingDto, @Req() req: any) {
     const adminName = req.user?.name || 'system';
     return await this.bookingService.cBookingRoomAff(body, adminName);
   }
 
-  @UseGuards(JwtAccGuard)
+  @ModuleAccess(MODULES.AFFILIATED_CLUBS)
   @Patch('booking/:id')
   async updateRoomBooking(
     @Param('id') id: string,

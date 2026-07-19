@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Edit, XCircle, Loader2, Receipt, User, NotepadText, CheckCircle, Ban, Eye, AlertTriangle, Lock } from "lucide-react";
+import { Plus, Edit, XCircle, Loader2, Receipt, User, NotepadText, CheckCircle, Ban, Eye, AlertTriangle, Lock, CreditCard } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -51,6 +51,7 @@ import {
   getVouchers,
   getHallDateStatuses,
   closeBooking,
+  userWho,
 } from "../../config/apis";
 import { Member, Voucher, DateStatus } from "@/types/room-booking.type";
 import {
@@ -84,6 +85,9 @@ import { VouchersDialog } from "@/components/VouchersDialog";
 import { CancelBookingDialog } from "@/components/CancelBookingDialog";
 import { CloseBookingDialog } from "@/components/CloseBookingDialog";
 import { PaymentMode } from "@/types/hall-booking.type";
+import { BookingPaymentSummaryCard } from "@/components/BookingPaymentSummaryCard";
+import { BookingPaymentDialog } from "@/components/BookingPaymentDialog";
+import { hasModuleAction } from "@/utils/permissions";
 import paymentRules from "../config/paymentRules.json";
 
 
@@ -526,6 +530,9 @@ const recalculateHeads = (basePrice: number, currentHeads: any[]) => {
 
 export default function HallBookings() {
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [createPaymentDialogOpen, setCreatePaymentDialogOpen] = useState(false);
+  const [editPaymentDialogOpen, setEditPaymentDialogOpen] = useState(false);
   const [editBooking, setEditBooking] = useState<HallBooking | null>(null);
   const [cancelBooking, setCancelBooking] = useState<HallBooking | null>(null);
   const [closeBookingTarget, setCloseBookingTarget] = useState<HallBooking | null>(null);
@@ -572,6 +579,20 @@ export default function HallBookings() {
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { data: currentUser } = useQuery({
+    queryKey: ["currentUser"],
+    queryFn: userWho,
+  });
+  const isSuperAdmin = currentUser?.role === "SUPER_ADMIN";
+  const canCreateHallBookings =
+    isSuperAdmin ||
+    hasModuleAction(currentUser?.permissions, "Hall Bookings", "create");
+  const canUpdateHallBookings =
+    isSuperAdmin ||
+    hasModuleAction(currentUser?.permissions, "Hall Bookings", "update");
+  const canDeleteHallBookings =
+    isSuperAdmin ||
+    hasModuleAction(currentUser?.permissions, "Hall Bookings", "delete");
   const location = useLocation();
 
 
@@ -920,6 +941,8 @@ export default function HallBookings() {
     onSuccess: () => {
       toast({ title: "Hall booking updated successfully" });
       queryClient.invalidateQueries({ queryKey: ["bookings"] });
+      setIsEditDialogOpen(false);
+      setEditPaymentDialogOpen(false);
       setEditBooking(null);
     },
     onError: (error: any, variables: any) => {
@@ -1206,6 +1229,7 @@ export default function HallBookings() {
   const handleEditFormChange = createFormChangeHandler(true);
 
   const handleCreate = () => {
+    if (!canCreateHallBookings) return;
     // Check if required fields are filled
     if (
       !form.membershipNo ||
@@ -1304,6 +1328,7 @@ export default function HallBookings() {
   };
 
   const handleUpdate = () => {
+    if (!canUpdateHallBookings) return;
 
     // console.log(editForm)
     // Enhanced validation that handles null/undefined values
@@ -1388,36 +1413,65 @@ export default function HallBookings() {
         return;
       }
     }
-    const payload = {
-      id: editBooking?.id?.toString(),
-      category: "Hall",
-      membershipNo: editForm.membershipNo,
-      entityId: editForm.hallId,
-      bookingDate: editForm.bookingDate,
-      eventType: editForm.eventType,
-      eventTime: editForm.bookingDetails[0]?.timeSlot || "DAY",
-      endDate: editForm.endDate,
-      numberOfGuests: editForm.numberOfGuests || 0,
-      totalPrice: editForm.totalPrice.toString(),
-      paymentStatus: editForm.paymentStatus,
-      paidAmount: editForm.paidAmount,
-      pendingAmount: editForm.pendingAmount,
-      pricingType: editForm.pricingType,
-      paymentMode: editForm.paymentMode,
-      card_number: editForm.card_number,
-      check_number: editForm.check_number,
-      bank_name: editForm.bank_name,
-      transaction_id: editForm.transaction_id,
-      paid_at: editForm.paid_at,
-      paidBy: editForm.paidBy,
-      guestName: editForm.guestName,
-      guestContact: editForm.guestContact,
-      remarks: editForm.remarks,
-      bookingDetails: editForm.bookingDetails,
-      heads: editForm.heads,
-    };
-
+    const payload = buildHallUpdatePayload();
     updateMutation.mutate(payload);
+  };
+
+  const buildHallUpdatePayload = (
+    sourceForm: HallBookingForm = editForm,
+    sourceBooking: HallBooking | null = editBooking
+  ) => {
+    return {
+      id: sourceBooking?.id?.toString(),
+      category: "Hall",
+      membershipNo: sourceForm.membershipNo,
+      entityId: sourceForm.hallId,
+      bookingDate: sourceForm.bookingDate,
+      eventType: sourceForm.eventType,
+      eventTime: sourceForm.bookingDetails[0]?.timeSlot || "DAY",
+      endDate: sourceForm.endDate,
+      numberOfGuests: sourceForm.numberOfGuests || 0,
+      totalPrice: sourceForm.totalPrice.toString(),
+      paymentStatus: sourceForm.paymentStatus,
+      paidAmount: sourceForm.paidAmount,
+      pendingAmount: sourceForm.pendingAmount,
+      pricingType: sourceForm.pricingType,
+      paymentMode: sourceForm.paymentMode,
+      card_number: sourceForm.card_number,
+      check_number: sourceForm.check_number,
+      bank_name: sourceForm.bank_name,
+      transaction_id: sourceForm.transaction_id,
+      paid_at: sourceForm.paid_at,
+      paidBy: sourceForm.paidBy,
+      guestName: sourceForm.guestName,
+      guestContact: sourceForm.guestContact,
+      remarks: sourceForm.remarks,
+      bookingDetails: sourceForm.bookingDetails,
+      heads: sourceForm.heads,
+    };
+  };
+
+  const handleSaveEditPayment = () => {
+    if (!editBooking) return;
+    if (!editForm.membershipNo || !editForm.hallId || !editForm.bookingDate) {
+      toast({
+        title: "Booking details are not ready yet",
+        description: "Please try again in a moment",
+        variant: "destructive",
+      });
+      return;
+    }
+    updateMutation.mutate(buildHallUpdatePayload());
+  };
+
+  const openEditDialog = (booking: HallBooking) => {
+    setEditBooking(booking);
+    setIsEditDialogOpen(true);
+  };
+
+  const openEditPaymentDialog = (booking: HallBooking) => {
+    setEditBooking(booking);
+    setEditPaymentDialogOpen(true);
   };
 
   const handleDelete = (reason: string) => {
@@ -1479,9 +1533,12 @@ export default function HallBookings() {
     setMemberSearch("");
     setSelectedMember(null);
     setShowMemberResults(false);
+    setCreatePaymentDialogOpen(false);
   };
 
   const resetEditForm = () => {
+    setIsEditDialogOpen(false);
+    setEditPaymentDialogOpen(false);
     setEditForm(hallInitialFormState);
     setEditBooking(null);
   };
@@ -1593,7 +1650,7 @@ export default function HallBookings() {
             }}
           >
             <DialogTrigger asChild>
-              <Button className="gap-2">
+              <Button className="gap-2" rbacAllowed={canCreateHallBookings}>
                 <Plus className="h-4 w-4" />
                 New Booking
               </Button>
@@ -2056,11 +2113,17 @@ export default function HallBookings() {
                     </div>
                   )}
 
-                  {/* Payment Section */}
-                  <div className="space-y-2">
-                    <Label className="text-lg">Payment Details</Label>
-                    <HallPaymentSection form={form} onChange={handleFormChange} />
-                  </div>
+                  {/* Payment Summary */}
+                  <BookingPaymentSummaryCard
+                    paymentStatus={form.paymentStatus}
+                    paidAmount={Number(form.paidAmount) || 0}
+                    pendingAmount={Number(form.pendingAmount) || 0}
+                    paymentMode={form.paymentMode}
+                    transactionId={form.transaction_id}
+                    onRecordPayment={
+                      canCreateHallBookings ? () => setCreatePaymentDialogOpen(true) : undefined
+                    }
+                  />
                 </div>
               </div>
 
@@ -2076,8 +2139,13 @@ export default function HallBookings() {
                   Cancel
                 </Button>
                 <Button
+                  rbacAllowed={canCreateHallBookings}
                   onClick={handleCreate}
-                  disabled={createMutation.isPending || !selectedMember}
+                  disabled={
+                    !canCreateHallBookings ||
+                    createMutation.isPending ||
+                    !selectedMember
+                  }
                 >
                   {createMutation.isPending ? (
                     <>
@@ -2188,14 +2256,27 @@ export default function HallBookings() {
                             </Button>
                             {(activeTab === "active" || activeTab === "cancelled") && (
                               <>
-                                {activeTab === "active" && (
+                                {activeTab === "active" && canUpdateHallBookings && (
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    onClick={() => setEditBooking(booking)}
+                                    rbacAllowed={canUpdateHallBookings}
+                                    onClick={() => openEditDialog(booking)}
                                     title="Edit Booking"
                                   >
                                     <Edit className="h-4 w-4" />
+                                  </Button>
+                                )}
+
+                                {activeTab === "active" && canUpdateHallBookings && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    rbacAllowed={canUpdateHallBookings}
+                                    onClick={() => openEditPaymentDialog(booking)}
+                                    title="Record Payment"
+                                  >
+                                    <CreditCard className="h-4 w-4" />
                                   </Button>
                                 )}
 
@@ -2209,10 +2290,11 @@ export default function HallBookings() {
                                 </Button>
 
 
-                                {activeTab === "active" && (
+                                {activeTab === "active" && canDeleteHallBookings && (
                                   <Button
                                     variant="ghost"
                                     size="icon"
+                                    rbacAllowed={canDeleteHallBookings}
                                     className="text-destructive"
                                     onClick={() => setCancelBooking(booking)}
                                     title="Cancel Booking"
@@ -2222,10 +2304,11 @@ export default function HallBookings() {
                                 )}
                               </>
                             )}
-                            {activeTab === "active" && (
+                            {activeTab === "active" && canUpdateHallBookings && (
                               <Button
                                 variant="ghost"
                                 size="icon"
+                                rbacAllowed={canUpdateHallBookings}
                                 className="text-amber-600"
                                 onClick={() => setCloseBookingTarget(booking)}
                                 title="Close Booking"
@@ -2233,11 +2316,12 @@ export default function HallBookings() {
                                 <Lock className="h-4 w-4" />
                               </Button>
                             )}
-                            {activeTab === "requests" && (
+                            {activeTab === "requests" && canUpdateHallBookings && (
                               <>
                                 <Button
                                   variant="ghost"
                                   size="icon"
+                                  rbacAllowed={canUpdateHallBookings}
                                   className="text-green-600"
                                   onClick={() => handleApproveReq(booking)}
                                   title="Approve Cancellation"
@@ -2247,6 +2331,7 @@ export default function HallBookings() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
+                                  rbacAllowed={canUpdateHallBookings}
                                   className="text-destructive"
                                   onClick={() => handleRejectReq(booking)}
                                   title="Reject Cancellation"
@@ -2291,7 +2376,7 @@ export default function HallBookings() {
 
       {/* Edit Dialog */}
       <Dialog
-        open={!!editBooking}
+        open={isEditDialogOpen && !!editBooking}
         onOpenChange={(open) => {
           if (!open) resetEditForm();
         }}
@@ -2838,14 +2923,17 @@ export default function HallBookings() {
                 </div>
               )}
 
-              {/* Payment Section */}
-              <div className="space-y-2">
-                <Label className="text-lg">Payment Details</Label>
-                <HallPaymentSection
-                  form={editForm}
-                  onChange={handleEditFormChange}
-                />
-              </div>
+              {/* Payment Summary */}
+              <BookingPaymentSummaryCard
+                paymentStatus={editForm.paymentStatus}
+                paidAmount={Number(editForm.paidAmount) || 0}
+                pendingAmount={Number(editForm.pendingAmount) || 0}
+                paymentMode={editForm.paymentMode}
+                transactionId={editForm.transaction_id}
+                onRecordPayment={
+                  canUpdateHallBookings ? () => setEditPaymentDialogOpen(true) : undefined
+                }
+              />
             </div>
           </div>
 
@@ -2854,7 +2942,11 @@ export default function HallBookings() {
             <Button variant="outline" onClick={() => resetEditForm()}>
               Cancel
             </Button>
-            <Button onClick={handleUpdate} disabled={updateMutation.isPending}>
+            <Button
+              rbacAllowed={canUpdateHallBookings}
+              onClick={handleUpdate}
+              disabled={!canUpdateHallBookings || updateMutation.isPending}
+            >
               {updateMutation.isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -2867,6 +2959,28 @@ export default function HallBookings() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <BookingPaymentDialog
+        open={createPaymentDialogOpen}
+        onOpenChange={setCreatePaymentDialogOpen}
+        title="Record Payment (New Hall Booking)"
+        description="Apply payment and transaction details before creating the booking."
+        onSave={() => setCreatePaymentDialogOpen(false)}
+        saveLabel="Use Payment Details"
+      >
+        <HallPaymentSection form={form} onChange={handleFormChange} />
+      </BookingPaymentDialog>
+
+      <BookingPaymentDialog
+        open={editPaymentDialogOpen && !!editBooking}
+        onOpenChange={(open) => setEditPaymentDialogOpen(open)}
+        title={`Record Payment (Hall Booking #${editBooking?.id ?? ""})`}
+        description="Save payment/transaction updates without using the edit form."
+        onSave={handleSaveEditPayment}
+        isSaving={updateMutation.isPending}
+      >
+        <HallPaymentSection form={editForm} onChange={handleEditFormChange} />
+      </BookingPaymentDialog>
 
       {/* booking details */}
       <Dialog open={openDetails} onOpenChange={setOpenDetails}>
@@ -2968,6 +3082,8 @@ export default function HallBookings() {
             </Button>
             <Button
               variant={updateStatus === "APPROVED" ? "default" : "destructive"}
+              rbacAllowed={canUpdateHallBookings}
+              disabled={!canUpdateHallBookings || updateCancellationReqMutation.isPending}
               onClick={() => {
                 if (updateReqBooking) {
                   updateCancellationReqMutation.mutate({
@@ -2978,7 +3094,6 @@ export default function HallBookings() {
                   });
                 }
               }}
-              disabled={updateCancellationReqMutation.isPending}
             >
               {updateCancellationReqMutation.isPending ? (
                 <>

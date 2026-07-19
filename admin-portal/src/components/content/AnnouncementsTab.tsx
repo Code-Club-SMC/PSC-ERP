@@ -1,3 +1,4 @@
+import { usePermissionAccess } from "@/hooks/use-permissions";
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -36,6 +37,7 @@ const quillFormats = [
 ];
 
 export default function AnnouncementsTab() {
+    const { canCreate, canUpdate, canDelete } = usePermissionAccess("Contents");
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [editItem, setEditItem] = useState<any>(null);
     const [deleteData, setDeleteData] = useState<any>(null);
@@ -94,7 +96,7 @@ export default function AnnouncementsTab() {
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <h3 className="text-2xl font-semibold">Announcements</h3>
-                <Button onClick={() => setIsAddOpen(true)} className="gap-2">
+                <Button rbacAllowed={canCreate} onClick={() => setIsAddOpen(true)} className="gap-2">
                     <Plus className="h-4 w-4" /> Add Announcement
                 </Button>
             </div>
@@ -114,8 +116,8 @@ export default function AnnouncementsTab() {
                                     </div>
                                 </div>
                                 <div className="flex gap-2">
-                                    <Button variant="ghost" size="icon" onClick={() => setEditItem(item)}><Edit className="h-4 w-4" /></Button>
-                                    <Button variant="ghost" size="icon" onClick={() => setDeleteData(item)}><Trash2 className="h-4 w-4" /></Button>
+                                    <Button rbacAllowed={canUpdate} variant="ghost" size="icon" onClick={() => setEditItem(item)}><Edit className="h-4 w-4" /></Button>
+                                    <Button rbacAllowed={canDelete} variant="ghost" size="icon" onClick={() => setDeleteData(item)}><Trash2 className="h-4 w-4" /></Button>
                                 </div>
                             </div>
                             <div className="mt-3 text-sm prose max-w-none" dangerouslySetInnerHTML={{ __html: item.description }} />
@@ -155,7 +157,7 @@ export default function AnnouncementsTab() {
                     <p>Are you sure?</p>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setDeleteData(null)} disabled={deleteMutation.isPending}>Cancel</Button>
-                        <Button variant="destructive" onClick={() => deleteMutation.mutate(deleteData.id)} disabled={deleteMutation.isPending}>
+                        <Button rbacAllowed={canDelete} variant="destructive" onClick={() => deleteMutation.mutate(deleteData.id)} disabled={deleteMutation.isPending}>
                             {deleteMutation.isPending ? "Deleting..." : "Delete"}
                         </Button>
                     </DialogFooter>

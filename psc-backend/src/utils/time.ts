@@ -36,6 +36,20 @@ export function formatPakistanDate(date: Date): string {
   });
 }
 
+export function toPakistanDateKey(date: Date | string): string {
+  const parsed = date instanceof Date ? new Date(date) : new Date(date);
+  if (isNaN(parsed.getTime())) return '';
+
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Karachi',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+
+  return formatter.format(parsed);
+}
+
 export function normalizeDate(dateString: string): Date {
   const date = new Date(dateString);
   date.setHours(0, 0, 0, 0);

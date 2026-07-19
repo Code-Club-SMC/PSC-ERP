@@ -12,20 +12,18 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
-import { RolesEnum } from 'src/common/constants/roles.enum';
-import { Roles } from 'src/common/decorators/roles.decorator';
 import { JwtAccGuard } from 'src/common/guards/jwt-access.guard';
-import { RolesGuard } from 'src/common/guards/roles.guard';
 import { PhotoShootDto } from './dtos/photoshoot.dto';
 import { PhotoshootService } from './photoshoot.service';
+import { ModuleAccess } from 'src/common/decorators/module-access.decorator';
+import { MODULES } from 'src/common/constants/modules.constants';
 
 @Controller('photoshoot')
 export class PhotoshootController {
   constructor(private photo: PhotoshootService) {}
 
   // photoshoot
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN)
+  @ModuleAccess(MODULES.PHOTOSHOOT)
   @UseInterceptors(FilesInterceptor('files', 5))
   @Post('create/photoShoot')
   async createPhotoShoot(
@@ -36,8 +34,7 @@ export class PhotoshootController {
     const adminName = req.user?.name || 'system';
     return this.photo.createPhotoShoot(payload, files, adminName);
   }
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN)
+  @ModuleAccess(MODULES.PHOTOSHOOT)
   @UseInterceptors(FilesInterceptor('files', 5))
   @Patch('update/photoShoot')
   async updatePhotoShoot(
@@ -62,14 +59,14 @@ export class PhotoshootController {
   async getAvailPhotoShoots() {
     return this.photo.getPhotoshoots();
   }
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN)
+  @ModuleAccess(MODULES.PHOTOSHOOT)
   @Delete('delete/photoShoot')
   async deletePhotoShoot(@Query('id') id: string) {
     return this.photo.deletePhotoshoot(Number(id));
   }
 
-  @UseGuards(JwtAccGuard)
+  @ModuleAccess(MODULES.PHOTOSHOOT)
+  @Patch('reserve/photoshoots')
   async reservePhotoShoots(@Req() req: any, @Body() payload: any) {
     const admin = req.user;
     const adminName = admin?.name || 'system';
@@ -85,7 +82,7 @@ export class PhotoshootController {
     );
   }
 
-  @UseGuards(JwtAccGuard)
+  @ModuleAccess(MODULES.PHOTOSHOOT_BOOKINGS, MODULES.CALENDAR)
   @Get('logs')
   async getPhotoshootLogs(
     @Query('photoshootId') photoshootId: string,

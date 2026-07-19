@@ -1,3 +1,4 @@
+import { usePermissionAccess } from "@/hooks/use-permissions";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -142,6 +143,7 @@ interface Room {
 }
 
 export default function Rooms() {
+  const { canCreate, canUpdate, canDelete } = usePermissionAccess("Rooms");
   const { toast } = useToast();
   const fetchLogs = async (roomId: string, range: DateRange | undefined) => {
     if (!range?.from || !range?.to) return;
@@ -888,6 +890,7 @@ export default function Rooms() {
 
           <Button
             variant="outline"
+            rbacAllowed={canUpdate}
             onClick={() => setReserveDialog(true)}
             className="gap-2"
             disabled={roomsLoading}
@@ -904,7 +907,7 @@ export default function Rooms() {
             }}
           >
             <DialogTrigger asChild>
-              <Button
+              <Button rbacAllowed={canCreate}
                 className="gap-2"
                 onClick={() => {
                   setIsAddOpen(true);
@@ -1384,6 +1387,7 @@ export default function Rooms() {
                           <Button
                             variant="ghost"
                             size="icon"
+                            rbacAllowed={canUpdate}
                             onClick={() => openEditDialog(room)}
                             title="Edit room"
                           >
@@ -1392,6 +1396,7 @@ export default function Rooms() {
                           <Button
                             variant="ghost"
                             size="icon"
+                            rbacAllowed={canDelete}
                             onClick={() => setDeleteDialog(room)}
                             title="Delete room"
                             className="text-destructive hover:text-destructive"
@@ -1887,7 +1892,7 @@ export default function Rooms() {
                   Cancel
                 </Button>
                 <Button
-                  onClick={handleBulkReserve}
+                  rbacAllowed={canUpdate} onClick={handleBulkReserve}
                   disabled={
                     reserveMutation.isPending ||
                     !reserveDates.from ||

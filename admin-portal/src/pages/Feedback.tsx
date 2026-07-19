@@ -1,3 +1,4 @@
+import { usePermissionAccess } from "@/hooks/use-permissions";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -47,6 +48,7 @@ import {
 import { cn } from "@/lib/utils";
 
 export default function Feedback() {
+  const { canCreate, canUpdate, canDelete } = usePermissionAccess("Feedback");
     const queryClient = useQueryClient();
     const { toast } = useToast();
     const [selectedFeedback, setSelectedFeedback] = useState<any>(null);
@@ -267,6 +269,7 @@ export default function Feedback() {
                             </div>
                             <div className="flex items-center gap-3">
                                 <Select
+                                    disabled={!canUpdate}
                                     value={selectedFeedback?.status}
                                     onValueChange={(val) => statusMutation.mutate({ id: selectedFeedback.id, status: val })}
                                 >
@@ -286,6 +289,7 @@ export default function Feedback() {
                             <div className="flex-1">
                                 <Label className="text-xs uppercase font-bold text-muted-foreground">Category</Label>
                                 <Select
+                                    disabled={!canUpdate}
                                     value={selectedFeedback?.categoryId?.toString() || "none"}
                                     onValueChange={(val) => assignCategoryMutation.mutate({
                                         id: selectedFeedback.id,
@@ -306,6 +310,7 @@ export default function Feedback() {
                             <div className="flex-1">
                                 <Label className="text-xs uppercase font-bold text-muted-foreground">Sub Category</Label>
                                 <Select
+                                    disabled={!canUpdate}
                                     value={
                                         selectedFeedback?.otherSubCategory ? "other" :
                                             selectedFeedback?.subCategoryId?.toString() || "none"
@@ -352,6 +357,7 @@ export default function Feedback() {
                                         />
                                         <Button
                                             size="sm"
+                                            rbacAllowed={canUpdate}
                                             onClick={() => assignSubCategoryMutation.mutate({
                                                 id: selectedFeedback.id,
                                                 subCategoryId: null,
@@ -432,6 +438,7 @@ export default function Feedback() {
                             <Button
                                 size="icon"
                                 className="h-[60px] w-[60px] shrink-0"
+                                rbacAllowed={canUpdate}
                                 onClick={handleAddRemark}
                                 disabled={!newRemark.trim() || remarkMutation.isPending}
                             >
@@ -458,7 +465,7 @@ export default function Feedback() {
                                     value={newCategory}
                                     onChange={(e) => setNewCategory(e.target.value)}
                                 />
-                                <Button size="icon" onClick={() => categoryMutation.mutate({ name: newCategory })} disabled={!newCategory.trim()}>
+                                <Button rbacAllowed={canCreate} size="icon" onClick={() => categoryMutation.mutate({ name: newCategory })} disabled={!newCategory.trim()}>
                                     <Plus className="h-4 w-4" />
                                 </Button>
                             </div>
@@ -466,7 +473,7 @@ export default function Feedback() {
                                 {categories.map((c: any) => (
                                     <div key={c.id} className="flex justify-between items-center p-2 rounded-md bg-muted/50 border">
                                         <span className="text-sm font-medium">{c.name}</span>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteCategoryMutation.mutate(c.id)}>
+                                        <Button rbacAllowed={canDelete} variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteCategoryMutation.mutate(c.id)}>
                                             <Trash2 className="h-4 w-4" />
                                         </Button>
                                     </div>
@@ -487,7 +494,7 @@ export default function Feedback() {
                                     value={newSubCategory}
                                     onChange={(e) => setNewSubCategory(e.target.value)}
                                 />
-                                <Button size="icon" onClick={() => subCategoryMutation.mutate({ name: newSubCategory })} disabled={!newSubCategory.trim()}>
+                                <Button rbacAllowed={canCreate} size="icon" onClick={() => subCategoryMutation.mutate({ name: newSubCategory })} disabled={!newSubCategory.trim()}>
                                     <Plus className="h-4 w-4" />
                                 </Button>
                             </div>
@@ -495,7 +502,7 @@ export default function Feedback() {
                                 {subCategories.map((sc: any) => (
                                     <div key={sc.id} className="flex justify-between items-center p-2 rounded-md bg-muted/50 border">
                                         <span className="text-sm font-medium">{sc.name}</span>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteSubCategoryMutation.mutate(sc.id)}>
+                                        <Button rbacAllowed={canDelete} variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteSubCategoryMutation.mutate(sc.id)}>
                                             <Trash2 className="h-4 w-4" />
                                         </Button>
                                     </div>

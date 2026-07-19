@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Edit, XCircle, Loader2, User, Search, Receipt, NotepadText, Calendar as CalendarIcon, Ban, Eye, CheckCircle, AlertTriangle, Lock } from "lucide-react";
+import { Plus, Edit, XCircle, Loader2, User, Search, Receipt, NotepadText, Calendar as CalendarIcon, Ban, Eye, CheckCircle, AlertTriangle, Lock, CreditCard } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
-import { getLawnCategories, getBookings, createBooking, updateBooking, cancelReqBooking, searchMembers, getVouchers, getLawnDateStatuses, updateCancellationReq, getCancelledBookings, getCancellationRequests, closeBooking } from "../../config/apis";
+import { getLawnCategories, getBookings, createBooking, updateBooking, cancelReqBooking, searchMembers, getVouchers, getLawnDateStatuses, updateCancellationReq, getCancelledBookings, getCancellationRequests, closeBooking, userWho } from "../../config/apis";
 import { FormInput, PaidAmountInput } from "@/components/FormInputs";
 import { UnifiedDatePicker } from "@/components/UnifiedDatePicker";
 import { format, addYears, startOfDay, addDays, differenceInCalendarDays } from "date-fns";
@@ -31,6 +31,9 @@ import {
 import paymentRules from "../config/paymentRules.json";
 import { CancelBookingDialog } from "@/components/CancelBookingDialog";
 import { CloseBookingDialog } from "@/components/CloseBookingDialog";
+import { BookingPaymentSummaryCard } from "@/components/BookingPaymentSummaryCard";
+import { BookingPaymentDialog } from "@/components/BookingPaymentDialog";
+import { hasModuleAction } from "@/utils/permissions";
 
 interface Member {
   id: number;
@@ -707,6 +710,9 @@ const recalculateHeads = (basePrice: number, currentHeads: { head: string; amoun
 
 export default function LawnBookings() {
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [createPaymentDialogOpen, setCreatePaymentDialogOpen] = useState(false);
+  const [editPaymentDialogOpen, setEditPaymentDialogOpen] = useState(false);
   const [editBooking, setEditBooking] = useState<LawnBooking | null>(null);
   const [cancelBooking, setCancelBooking] = useState<LawnBooking | null>(null);
   const [closeBookingTarget, setCloseBookingTarget] = useState<LawnBooking | null>(null);
@@ -752,6 +758,20 @@ export default function LawnBookings() {
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { data: currentUser } = useQuery({
+    queryKey: ["currentUser"],
+    queryFn: userWho,
+  });
+  const isSuperAdmin = currentUser?.role === "SUPER_ADMIN";
+  const canCreateLawnBookings =
+    isSuperAdmin ||
+    hasModuleAction(currentUser?.permissions, "Lawn Bookings", "create");
+  const canUpdateLawnBookings =
+    isSuperAdmin ||
+    hasModuleAction(currentUser?.permissions, "Lawn Bookings", "update");
+  const canDeleteLawnBookings =
+    isSuperAdmin ||
+    hasModuleAction(currentUser?.permissions, "Lawn Bookings", "delete");
   const location = useLocation();
 
   // Handle conversion from Reservation
@@ -1062,6 +1082,8 @@ export default function LawnBookings() {
     onSuccess: () => {
       toast({ title: "Lawn booking updated successfully" });
       queryClient.invalidateQueries({ queryKey: ["lawn-bookings"] });
+      setIsEditDialogOpen(false);
+      setEditPaymentDialogOpen(false);
       setEditBooking(null);
     },
     onError: (error: any, variables: any) => {
@@ -1439,10 +1461,119 @@ export default function LawnBookings() {
     setSelectedMember(null);
     setMemberSearch("");
     setShowMemberResults(false);
+    setCreatePaymentDialogOpen(false);
+  };
+
+  const resetEditForm = () => {
+    setIsEditDialogOpen(false);
+    setEditPaymentDialogOpen(false);
+    setEditBooking(null);
+    setEditForm(initialForm);
+  };
+
+  const buildLawnUpdatePayload = (
+    sourceForm: LawnBookingForm = editForm,
+    sourceBooking: LawnBooking | null = editBooking
+  ) => {
+    if (!sourceBooking || !sourceForm.bookingDetails || sourceForm.bookingDetails.length === 0) {
+      return null;
+    }
+
+    const membershipNo = sourceBooking.member?.Membership_No || sourceForm.membershipNo || "";
+    const sortedDates = [...new Set(sourceForm.bookingDetails.map((d) => d.date))].sort();
+
+    return {
+      id: sourceBooking.id.toString(),
+      category: "Lawn",
+      membershipNo,
+      entityId: sourceForm.lawnId.toString(),
+      bookingDate: new Date(sortedDates[0]).toISOString(),
+      endDate: new Date(sortedDates[sortedDates.length - 1]).toISOString(),
+      totalPrice: sourceForm.totalPrice.toString(),
+      paymentStatus: sourceForm.paymentStatus,
+      numberOfGuests: sourceForm.numberOfGuests,
+      paidAmount: sourceForm.paidAmount || 0,
+      pendingAmount: sourceForm.pendingAmount || 0,
+      pricingType: sourceForm.pricingType || "member",
+      paymentMode: sourceForm.paymentMode || "CASH",
+      card_number: sourceForm.card_number,
+      check_number: sourceForm.check_number,
+      bank_name: sourceForm.bank_name,
+      transaction_id: sourceForm.transaction_id,
+      paid_at: sourceForm.paid_at,
+      eventTime: sourceForm.bookingDetails[0].timeSlot,
+      eventType: sourceForm.bookingDetails[0].eventType,
+      bookingDetails: sourceForm.bookingDetails,
+      heads: sourceForm.heads,
+      paidBy: sourceForm.paidBy || "MEMBER",
+      guestName: sourceForm.guestName,
+      guestContact: sourceForm.guestContact,
+      guestCNIC: sourceForm.guestCNIC,
+    };
+  };
+
+  const handleUpdateBooking = () => {
+    if (!canUpdateLawnBookings) return;
+    if (!editBooking) return;
+
+    if (!editForm.bookingDetails || editForm.bookingDetails.length === 0) {
+      toast({ title: "Booking dates are required", variant: "destructive" });
+      return;
+    }
+
+    const missingEvent = editForm.bookingDetails.some((d) => !d.eventType);
+    if (missingEvent) {
+      toast({ title: "Event type is required for all slots", variant: "destructive" });
+      return;
+    }
+
+    if (!editForm.numberOfGuests || editForm.numberOfGuests < 1) {
+      toast({ title: "Guest count must be at least 1", variant: "destructive" });
+      return;
+    }
+
+    const membershipNo = editBooking.member?.Membership_No || editForm.membershipNo || "";
+    if (!membershipNo) {
+      toast({ title: "Membership number is missing", variant: "destructive" });
+      return;
+    }
+
+    const payload = buildLawnUpdatePayload();
+    if (!payload) {
+      toast({ title: "Unable to prepare booking payload", variant: "destructive" });
+      return;
+    }
+
+    updateMutation.mutate(payload);
+  };
+
+  const handleSaveEditPayment = () => {
+    if (!editBooking) return;
+    const payload = buildLawnUpdatePayload();
+    if (!payload) {
+      toast({
+        title: "Booking details are not ready yet",
+        description: "Please try again in a moment",
+        variant: "destructive",
+      });
+      return;
+    }
+    updateMutation.mutate(payload);
+  };
+
+  const openEditDialog = (booking: LawnBooking) => {
+    setEditBooking(booking);
+    setIsEditDialogOpen(true);
+  };
+
+  const openEditPaymentDialog = (booking: LawnBooking) => {
+    setEditBooking(booking);
+    setEditPaymentDialogOpen(true);
   };
 
 
   const handleCreateBooking = () => {
+    if (!canCreateLawnBookings) return;
     if (!selectedMember || !form.lawnId || form.bookingDetails.length === 0 || form.numberOfGuests < 1) {
       toast({
         title: "Please fill all required fields",
@@ -1658,7 +1789,7 @@ export default function LawnBookings() {
             if (!open) resetForm();
           }}>
             <DialogTrigger asChild>
-              <Button className="gap-2">
+              <Button className="gap-2" rbacAllowed={canCreateLawnBookings}>
                 <Plus className="h-4 w-4" />
                 New Booking
               </Button>
@@ -2010,29 +2141,17 @@ export default function LawnBookings() {
                     )}
                   </div>
 
-                  {/* Payment */}
-                  <div className="space-y-2">
-                    <LawnPaymentSection
-                      onChange={(field, value) => {
-                        setForm(prev => {
-                          const updated = { ...prev, [field]: value };
-                          if (field === "paymentStatus") {
-                            if (value === "PAID") {
-                              updated.paidAmount = prev.totalPrice;
-                              updated.pendingAmount = 0;
-                            } else if (value === "UNPAID") {
-                              updated.paidAmount = 0;
-                              updated.pendingAmount = prev.totalPrice;
-                            }
-                          } else if (field === "paidAmount") {
-                            updated.pendingAmount = prev.totalPrice - value;
-                          }
-                          return updated;
-                        });
-                      }}
-                      form={form}
-                    />
-                  </div>
+                  {/* Payment Summary */}
+                  <BookingPaymentSummaryCard
+                    paymentStatus={form.paymentStatus}
+                    paidAmount={Number(form.paidAmount) || 0}
+                    pendingAmount={Number(form.pendingAmount) || 0}
+                    paymentMode={form.paymentMode}
+                    transactionId={form.transaction_id}
+                    onRecordPayment={
+                      canCreateLawnBookings ? () => setCreatePaymentDialogOpen(true) : undefined
+                    }
+                  />
                 </div>
               </div>
 
@@ -2044,8 +2163,15 @@ export default function LawnBookings() {
                   Cancel
                 </Button>
                 <Button
+                  rbacAllowed={canCreateLawnBookings}
                   onClick={handleCreateBooking}
-                  disabled={!selectedMember || (form.bookingDetails[0]?.reservationId ? false : !form.lawnId) || form.totalPrice === 0 || createMutation.isPending}
+                  disabled={
+                    !canCreateLawnBookings ||
+                    !selectedMember ||
+                    (form.bookingDetails[0]?.reservationId ? false : !form.lawnId) ||
+                    form.totalPrice === 0 ||
+                    createMutation.isPending
+                  }
                 >
                   {createMutation.isPending ? "Creating..." : "Create Booking"}
                 </Button>
@@ -2157,34 +2283,38 @@ export default function LawnBookings() {
 
                             {activeTab === "active" && (
                               <>
-                                <Button variant="ghost" size="icon" onClick={() => {
-                                  setEditBooking(booking);
-                                }} title="Edit Booking">
-                                  <Edit className="h-4 w-4" />
-                                </Button>
+                                {canUpdateLawnBookings && (
+                                  <>
+                                    <Button variant="ghost" size="icon" rbacAllowed={canUpdateLawnBookings} onClick={() => openEditDialog(booking)} title="Edit Booking">
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                    <Button variant="ghost" size="icon" rbacAllowed={canUpdateLawnBookings} onClick={() => openEditPaymentDialog(booking)} title="Record Payment">
+                                      <CreditCard className="h-4 w-4" />
+                                    </Button>
+                                  </>
+                                )}
                                 <Button variant="ghost" size="icon" onClick={() => handleViewVouchers(booking)} title="View Vouchers">
                                   <Receipt className="h-4 w-4" />
                                 </Button>
-                                <Button variant="ghost" size="icon" className="text-destructive" onClick={() => setCancelBooking(booking)} title="Cancel Booking">
-                                  <XCircle className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="text-amber-600"
-                                  onClick={() => setCloseBookingTarget(booking)}
-                                  title="Close Booking"
-                                >
-                                  <Lock className="h-4 w-4" />
-                                </Button>
+                                {canDeleteLawnBookings && (
+                                  <Button variant="ghost" size="icon" rbacAllowed={canDeleteLawnBookings} className="text-destructive" onClick={() => setCancelBooking(booking)} title="Cancel Booking">
+                                    <XCircle className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {canUpdateLawnBookings && (
+                                  <Button variant="ghost" size="icon" rbacAllowed={canUpdateLawnBookings} className="text-amber-600" onClick={() => setCloseBookingTarget(booking)} title="Close Booking">
+                                    <Lock className="h-4 w-4" />
+                                  </Button>
+                                )}
                               </>
                             )}
 
-                            {activeTab === "requests" && (
+                            {activeTab === "requests" && canUpdateLawnBookings && (
                               <>
                                 <Button
                                   variant="ghost"
                                   size="icon"
+                                  rbacAllowed={canUpdateLawnBookings}
                                   className="text-blue-600"
                                   onClick={() => handleApproveReq(booking)}
                                   title="Approve Cancellation"
@@ -2194,6 +2324,7 @@ export default function LawnBookings() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
+                                  rbacAllowed={canUpdateLawnBookings}
                                   className="text-destructive"
                                   onClick={() => handleRejectReq(booking)}
                                   title="Reject Cancellation"
@@ -2248,7 +2379,12 @@ export default function LawnBookings() {
       </Tabs>
 
       {/* Edit Dialog */}
-      <Dialog open={!!editBooking} onOpenChange={() => setEditBooking(null)}>
+      <Dialog
+        open={isEditDialogOpen && !!editBooking}
+        onOpenChange={(open) => {
+          if (!open) resetEditForm();
+        }}
+      >
         <DialogContent className="max-w-7xl max-h-fit overflow-hidden">
           <DialogHeader className="border-b pb-4">
             <DialogTitle>Edit Lawn Booking</DialogTitle>
@@ -2566,111 +2702,26 @@ export default function LawnBookings() {
                 )}
               </div>
 
-              {/* Payment Section */}
-              <div className="space-y-2">
-                <LawnPaymentSection
-                  form={editForm}
-                  onChange={(field, value) => handleEditFormChange(field as keyof LawnBookingForm, value)}
-                />
-              </div>
+              {/* Payment Summary */}
+              <BookingPaymentSummaryCard
+                paymentStatus={editForm.paymentStatus}
+                paidAmount={Number(editForm.paidAmount) || 0}
+                pendingAmount={Number(editForm.pendingAmount) || 0}
+                paymentMode={editForm.paymentMode}
+                transactionId={editForm.transaction_id}
+                onRecordPayment={
+                  canUpdateLawnBookings ? () => setEditPaymentDialogOpen(true) : undefined
+                }
+              />
             </div>
           </div>
 
           <DialogFooter className="border-t pt-4">
-            <Button variant="outline" onClick={() => setEditBooking(null)}>Cancel</Button>
+            <Button variant="outline" onClick={resetEditForm}>Cancel</Button>
             <Button
-              onClick={() => {
-                if (!editBooking) return;
-
-                // VALIDATION
-                if (!editForm.bookingDetails || editForm.bookingDetails.length === 0) {
-                  toast({ title: "Booking dates are required", variant: "destructive" });
-                  return;
-                }
-                const missingEvent = editForm.bookingDetails.some(d => !d.eventType);
-                if (missingEvent) {
-                  toast({ title: "Event type is required for all slots", variant: "destructive" });
-                  return;
-                }
-
-                if (!editForm.numberOfGuests || editForm.numberOfGuests < 1) {
-                  toast({ title: "Guest count must be at least 1", variant: "destructive" });
-                  return;
-                }
-
-                const membershipNo = editBooking.member?.Membership_No || editForm.membershipNo || "";
-                if (!membershipNo) {
-                  toast({ title: "Membership number is missing", variant: "destructive" });
-                  return;
-                }
-
-                const sortedDates = [...new Set(editForm.bookingDetails.map(d => d.date))].sort();
-
-                // Optimization: Only run conflict check if lawn or dates changed
-                const normalizeDate = (d: string | Date | undefined) => (d ? new Date(d).toISOString().split('T')[0] : '');
-                const normalizeDetails = (details: any[] | undefined) =>
-                  (details || [])
-                    .map((d: any) => `${normalizeDate(d.date)}|${d.timeSlot?.toUpperCase()}`)
-                    .sort()
-                    .join(',');
-
-                // Note: editBooking.lawn?.id might be different from editForm.lawnId
-                const schedulingChanged =
-                  editBooking.lawn?.id?.toString() !== editForm.lawnId?.toString() ||
-                  normalizeDate(editBooking.bookingDate) !== normalizeDate(editForm.bookingDate) ||
-                  normalizeDate(editBooking.endDate || editBooking.bookingDate) !== normalizeDate(editForm.endDate || editForm.bookingDate) ||
-                  normalizeDetails(editBooking.bookingDetails as any[]) !== normalizeDetails(editForm.bookingDetails);
-
-                if (schedulingChanged) {
-                  // Final conflict check before submission
-                  const conflict = getAvailableLawnTimeSlots(
-                    editForm.lawnId.toString(),
-                    editForm.bookingDate,
-                    lawnBookings,
-                    availableLawnsData as Lawn[],
-                    fetchedStatuses?.reservations || []
-                  );
-
-                  // LawnBookings doesn't have a centralized checkLawnConflicts helper like Hall, 
-                  // but we can check if the current slots are still available.
-                  // HOWEVER, the backend will catch it anyway. 
-                  // For UI UX consistency with Hall, we'll rely on the backend for Lawn update conflicts 
-                  // or implement a check if needed.
-                }
-
-                const payload = {
-                  id: editBooking.id.toString(),
-                  category: "Lawn",
-                  membershipNo: membershipNo,
-                  entityId: editForm.lawnId.toString(),
-                  bookingDate: new Date(sortedDates[0]).toISOString(),
-                  endDate: new Date(sortedDates[sortedDates.length - 1]).toISOString(),
-                  totalPrice: editForm.totalPrice.toString(),
-                  paymentStatus: editForm.paymentStatus,
-                  numberOfGuests: editForm.numberOfGuests,
-                  paidAmount: editForm.paidAmount || 0,
-                  pendingAmount: editForm.pendingAmount || 0,
-                  pricingType: editForm.pricingType || "member",
-                  paymentMode: editForm.paymentMode || "CASH",
-                  card_number: editForm.card_number,
-                  check_number: editForm.check_number,
-                  bank_name: editForm.bank_name,
-                  transaction_id: editForm.transaction_id,
-                  paid_at: editForm.paid_at,
-                  eventTime: editForm.bookingDetails[0].timeSlot, // Legacy support
-                  eventType: editForm.bookingDetails[0].eventType, // Legacy support
-                  bookingDetails: editForm.bookingDetails,
-                  heads: editForm.heads,
-                  paidBy: editForm.paidBy || "MEMBER",
-                  guestName: editForm.guestName,
-                  guestContact: editForm.guestContact,
-                  guestCNIC: editForm.guestCNIC,
-                };
-
-
-                updateMutation.mutate(payload);
-              }}
-              disabled={updateMutation.isPending}
+              rbacAllowed={canUpdateLawnBookings}
+              onClick={handleUpdateBooking}
+              disabled={!canUpdateLawnBookings || updateMutation.isPending}
             >
               {updateMutation.isPending ? (
                 <>
@@ -2684,6 +2735,50 @@ export default function LawnBookings() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <BookingPaymentDialog
+        open={createPaymentDialogOpen}
+        onOpenChange={setCreatePaymentDialogOpen}
+        title="Record Payment (New Lawn Booking)"
+        description="Apply payment and transaction details before creating the booking."
+        onSave={() => setCreatePaymentDialogOpen(false)}
+        saveLabel="Use Payment Details"
+      >
+        <LawnPaymentSection
+          form={form}
+          onChange={(field, value) =>
+            setForm((prev) => {
+              const updated = { ...prev, [field]: value };
+              if (field === "paymentStatus") {
+                if (value === "PAID") {
+                  updated.paidAmount = prev.totalPrice;
+                  updated.pendingAmount = 0;
+                } else if (value === "UNPAID") {
+                  updated.paidAmount = 0;
+                  updated.pendingAmount = prev.totalPrice;
+                }
+              } else if (field === "paidAmount") {
+                updated.pendingAmount = prev.totalPrice - value;
+              }
+              return updated;
+            })
+          }
+        />
+      </BookingPaymentDialog>
+
+      <BookingPaymentDialog
+        open={editPaymentDialogOpen && !!editBooking}
+        onOpenChange={(open) => setEditPaymentDialogOpen(open)}
+        title={`Record Payment (Lawn Booking #${editBooking?.id ?? ""})`}
+        description="Save payment/transaction updates without using the edit form."
+        onSave={handleSaveEditPayment}
+        isSaving={updateMutation.isPending}
+      >
+        <LawnPaymentSection
+          form={editForm}
+          onChange={(field, value) => handleEditFormChange(field as keyof LawnBookingForm, value)}
+        />
+      </BookingPaymentDialog>
 
       {/* booking details */}
       <Dialog open={openDetails} onOpenChange={setOpenDetails}>
@@ -2774,6 +2869,7 @@ export default function LawnBookings() {
             <Button variant="outline" onClick={() => setUpdateReqBooking(null)}>Cancel</Button>
             <Button
               className={updateStatus === "APPROVED" ? "bg-blue-600 hover:bg-blue-700 font-medium" : "bg-destructive hover:bg-destructive/90 font-medium"}
+              rbacAllowed={canUpdateLawnBookings}
               onClick={() => {
                 updateReqMutation.mutate({
                   bookingFor: "lawns",
@@ -2782,7 +2878,7 @@ export default function LawnBookings() {
                   remarks: adminRemarks
                 });
               }}
-              disabled={updateReqMutation.isPending}
+              disabled={!canUpdateLawnBookings || updateReqMutation.isPending}
             >
               {updateReqMutation.isPending ? "Updating..." : `Confirm ${updateStatus === "APPROVED" ? "Approval" : "Rejection"}`}
             </Button>

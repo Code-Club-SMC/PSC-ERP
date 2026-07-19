@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { HallBookingReportDto, HallDailyCheckoutDto, HallMonthlyGridDto } from './dtos/hall-report.dto';
+import { parsePakistanDate, toPakistanDateKey } from 'src/utils/time';
 
 @Injectable()
 export class HallReportsService {
@@ -40,14 +41,15 @@ export class HallReportsService {
     let toDateParsed: Date | undefined;
 
     if (fromDate) {
-      fromDateParsed = new Date(fromDate);
+      fromDateParsed = parsePakistanDate(fromDate);
+      fromDateParsed.setHours(0, 0, 0, 0);
       if (isNaN(fromDateParsed.getTime())) {
         throw new BadRequestException(`Invalid fromDate format: ${fromDate}`);
       }
     }
 
     if (toDate) {
-      toDateParsed = new Date(toDate);
+      toDateParsed = parsePakistanDate(toDate);
       if (isNaN(toDateParsed.getTime())) {
         throw new BadRequestException(`Invalid toDate format: ${toDate}`);
       }
@@ -185,19 +187,13 @@ export class HallReportsService {
   }
 
   async getDailyCheckout(date: string): Promise<HallDailyCheckoutDto> {
-    const parsedDate = new Date(date);
+    const parsedDate = parsePakistanDate(date);
     if (isNaN(parsedDate.getTime())) {
       throw new BadRequestException(`Invalid date format: ${date}`);
     }
 
-    // Normalize to start of day (UTC)
-    const dayStart = new Date(
-      Date.UTC(
-        parsedDate.getUTCFullYear(),
-        parsedDate.getUTCMonth(),
-        parsedDate.getUTCDate(),
-      ),
-    );
+    const dayStart = new Date(parsedDate);
+    dayStart.setHours(0, 0, 0, 0);
     const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
 
     // Opening balance: sum of closed hall + lawn bookings strictly before this date
@@ -261,12 +257,13 @@ export class HallReportsService {
     if (!fromDate) throw new BadRequestException('fromDate is required');
     if (!toDate) throw new BadRequestException('toDate is required');
 
-    const from = new Date(fromDate);
+    const from = parsePakistanDate(fromDate);
+    from.setHours(0, 0, 0, 0);
     if (isNaN(from.getTime())) {
       throw new BadRequestException(`Invalid fromDate format: ${fromDate}`);
     }
 
-    const to = new Date(toDate);
+    const to = parsePakistanDate(toDate);
     if (isNaN(to.getTime())) {
       throw new BadRequestException(`Invalid toDate format: ${toDate}`);
     }
@@ -355,7 +352,7 @@ export class HallReportsService {
     const total = Number(booking.totalPrice);
     const rent = total - food - gst - serviceCharge;
 
-    const eventDate = new Date(booking.bookingDate).toISOString().split('T')[0];
+    const eventDate = toPakistanDateKey(booking.bookingDate);
 
     return {
       hallName,
@@ -396,7 +393,7 @@ export class HallReportsService {
     dto.venueType = 'HALL';
     dto.memberName = booking.member?.Name ?? booking.guestName ?? '';
     dto.memberNumber = booking.member?.Membership_No ?? '';
-    dto.eventDate = new Date(booking.bookingDate).toISOString().split('T')[0];
+    dto.eventDate = toPakistanDateKey(booking.bookingDate);
     dto.eventType = booking.eventType ?? '';
     dto.timeSlot = booking.bookingTime ?? '';
     dto.rent = rent;
@@ -439,7 +436,7 @@ export class HallReportsService {
     dto.venueType = 'LAWN';
     dto.memberName = booking.member?.Name ?? booking.guestName ?? '';
     dto.memberNumber = booking.member?.Membership_No ?? '';
-    dto.eventDate = new Date(booking.bookingDate).toISOString().split('T')[0];
+    dto.eventDate = toPakistanDateKey(booking.bookingDate);
     dto.eventType = booking.eventType ?? '';
     dto.timeSlot = booking.bookingTime ?? '';
     dto.rent = rent;

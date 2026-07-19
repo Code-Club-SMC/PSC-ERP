@@ -15,8 +15,11 @@ import {
 import { MessingService } from './messing.service';
 import { JwtAccGuard } from '../common/guards/jwt-access.guard';
 import { FilesInterceptor } from '@nestjs/platform-express';
+import { ModuleAccess } from 'src/common/decorators/module-access.decorator';
+import { MODULES } from 'src/common/constants/modules.constants';
 
 @Controller('messing')
+@ModuleAccess(MODULES.MESSING)
 export class MessingController {
   constructor(private readonly messingService: MessingService) { }
 

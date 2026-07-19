@@ -30,6 +30,7 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
+import { usePermissionAccess } from "@/hooks/use-permissions";
 
 interface Admin {
     id: number;
@@ -55,6 +56,7 @@ const AdminReservations = () => {
     const [dateRange, setDateRange] = useState<DateRange | undefined>();
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
+    const { canUpdate } = usePermissionAccess("Admin Reservations");
 
     useEffect(() => {
         fetchAdmins();
@@ -240,6 +242,7 @@ const AdminReservations = () => {
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
+                                                rbacAllowed={canUpdate}
                                                 className="h-8 gap-2 border border-primary/20 hover:border-primary hover:bg-primary/5 text-primary font-bold text-xs"
                                                 onClick={() => handleConvertToBooking(res)}
                                             >

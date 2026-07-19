@@ -1,3 +1,4 @@
+import { usePermissionAccess } from "@/hooks/use-permissions";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ interface ClubRulesTabProps {
 }
 
 export default function ClubRulesTab({ type, title }: ClubRulesTabProps) {
+    const { canCreate, canUpdate, canDelete } = usePermissionAccess("Contents");
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [editRule, setEditRule] = useState<any>(null);
     const [deleteData, setDeleteData] = useState<any>(null);
@@ -76,7 +78,7 @@ export default function ClubRulesTab({ type, title }: ClubRulesTabProps) {
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <h3 className="text-2xl font-semibold">{title}</h3>
-                <Button onClick={() => setIsAddOpen(true)} className="gap-2">
+                <Button rbacAllowed={canCreate} onClick={() => setIsAddOpen(true)} className="gap-2">
                     <Plus className="h-4 w-4" /> Add Rule Section
                 </Button>
             </div>
@@ -94,8 +96,8 @@ export default function ClubRulesTab({ type, title }: ClubRulesTabProps) {
                                     <Button variant="ghost" size="icon" onClick={() => setPreviewRule(rule)} title="Preview">
                                         <Eye className="h-4 w-4" />
                                     </Button>
-                                    <Button variant="ghost" size="icon" onClick={() => setEditRule(rule)}><Edit className="h-4 w-4" /></Button>
-                                    <Button variant="ghost" size="icon" onClick={() => setDeleteData(rule)}><Trash2 className="h-4 w-4" /></Button>
+                                    <Button rbacAllowed={canUpdate} variant="ghost" size="icon" onClick={() => setEditRule(rule)}><Edit className="h-4 w-4" /></Button>
+                                    <Button rbacAllowed={canDelete} variant="ghost" size="icon" onClick={() => setDeleteData(rule)}><Trash2 className="h-4 w-4" /></Button>
                                 </div>
                             </div>
                         </CardContent>
@@ -139,7 +141,7 @@ export default function ClubRulesTab({ type, title }: ClubRulesTabProps) {
                     <p>Are you sure you want to delete this rule section?</p>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setDeleteData(null)}>Cancel</Button>
-                        <Button variant="destructive" onClick={() => deleteMutation.mutate(deleteData.id)} disabled={deleteMutation.isPending}>
+                        <Button rbacAllowed={canDelete} variant="destructive" onClick={() => deleteMutation.mutate(deleteData.id)} disabled={deleteMutation.isPending}>
                             {deleteMutation.isPending ? "Deleting..." : "Delete"}
                         </Button>
                     </DialogFooter>

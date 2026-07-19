@@ -1,3 +1,4 @@
+import { usePermissionAccess } from "@/hooks/use-permissions";
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -12,6 +13,7 @@ import { getContactUs, upsertContactUs, deleteContactUs } from "../../../config/
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export default function ContactUsTab() {
+    const { canCreate, canUpdate, canDelete } = usePermissionAccess("Contents");
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -60,7 +62,7 @@ export default function ContactUsTab() {
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <h3 className="text-xl font-bold">Contact Settings</h3>
-                <Button onClick={() => handleOpenDialog()} className="gap-2">
+                <Button rbacAllowed={canCreate} onClick={() => handleOpenDialog()} className="gap-2">
                     <Plus className="h-4 w-4" /> Add Contact Category
                 </Button>
             </div>
@@ -118,10 +120,10 @@ export default function ContactUsTab() {
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex justify-end gap-2">
-                                                <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(contact)}>
+                                                <Button rbacAllowed={canUpdate} variant="ghost" size="icon" onClick={() => handleOpenDialog(contact)}>
                                                     <Edit className="h-4 w-4" />
                                                 </Button>
-                                                <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => handleDeleteClick(contact)}>
+                                                <Button rbacAllowed={canDelete} variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => handleDeleteClick(contact)}>
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
                                             </div>
@@ -160,7 +162,7 @@ export default function ContactUsTab() {
                     <p>Are you sure you want to delete contact info for <strong>{contactToDelete?.category}</strong>? This action cannot be undone.</p>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsDeleteConfirmOpen(false)} disabled={deleteMutation.isPending}>Cancel</Button>
-                        <Button variant="destructive" onClick={() => deleteMutation.mutate(contactToDelete.id)} disabled={deleteMutation.isPending}>
+                        <Button rbacAllowed={canDelete} variant="destructive" onClick={() => deleteMutation.mutate(contactToDelete.id)} disabled={deleteMutation.isPending}>
                             {deleteMutation.isPending ? "Deleting..." : "Delete"}
                         </Button>
                     </DialogFooter>

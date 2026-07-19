@@ -13,6 +13,11 @@ import {
 import { FeedbackService } from './feedback.service';
 import { JwtAccGuard } from 'src/common/guards/jwt-access.guard';
 import { AddFeedbackRemarkDto, UpdateFeedbackStatusDto, CreateFeedbackCategoryDto, CreateFeedbackSubCategoryDto, CreateFeedbackDto } from './dtos/feedback.dto';
+import {
+    ActionAccess,
+    ModuleAccess,
+} from 'src/common/decorators/module-access.decorator';
+import { MODULES } from 'src/common/constants/modules.constants';
 
 @Controller('feedback')
 export class FeedbackController {
@@ -24,13 +29,13 @@ export class FeedbackController {
         return this.feedbackService.createFeedback(dto, req.user.id);
     }
 
-    @UseGuards(JwtAccGuard)
+    @ModuleAccess(MODULES.FEEDBACK)
     @Get()
     async findAll() {
         return this.feedbackService.findAll();
     }
 
-    @UseGuards(JwtAccGuard)
+    @ModuleAccess(MODULES.FEEDBACK)
     @Patch(':id/status')
     async updateStatus(
         @Param('id', ParseIntPipe) id: number,
@@ -39,7 +44,8 @@ export class FeedbackController {
         return this.feedbackService.updateStatus(id, dto.status);
     }
 
-    @UseGuards(JwtAccGuard)
+    @ModuleAccess(MODULES.FEEDBACK)
+    @ActionAccess('update')
     @Post(':id/remark')
     async addRemark(
         @Param('id', ParseIntPipe) id: number,
@@ -55,13 +61,13 @@ export class FeedbackController {
         return this.feedbackService.findAllCategories();
     }
 
-    @UseGuards(JwtAccGuard)
+    @ModuleAccess(MODULES.FEEDBACK)
     @Post('categories')
     async createCategory(@Body() dto: CreateFeedbackCategoryDto) {
         return this.feedbackService.createCategory(dto);
     }
 
-    @UseGuards(JwtAccGuard)
+    @ModuleAccess(MODULES.FEEDBACK)
     @Delete('categories/:id')
     async deleteCategory(@Param('id', ParseIntPipe) id: number) {
         return this.feedbackService.deleteCategory(id);
@@ -74,19 +80,19 @@ export class FeedbackController {
         return this.feedbackService.findAllSubCategories();
     }
 
-    @UseGuards(JwtAccGuard)
+    @ModuleAccess(MODULES.FEEDBACK)
     @Post('subcategories')
     async createSubCategory(@Body() dto: CreateFeedbackSubCategoryDto) {
         return this.feedbackService.createSubCategory(dto);
     }
 
-    @UseGuards(JwtAccGuard)
+    @ModuleAccess(MODULES.FEEDBACK)
     @Delete('subcategories/:id')
     async deleteSubCategory(@Param('id', ParseIntPipe) id: number) {
         return this.feedbackService.deleteSubCategory(id);
     }
 
-    @UseGuards(JwtAccGuard)
+    @ModuleAccess(MODULES.FEEDBACK)
     @Patch(':id/category')
     async assignCategory(
         @Param('id', ParseIntPipe) id: number,
@@ -95,7 +101,7 @@ export class FeedbackController {
         return this.feedbackService.assignCategory(id, categoryId);
     }
 
-    @UseGuards(JwtAccGuard)
+    @ModuleAccess(MODULES.FEEDBACK)
     @Patch(':id/subcategory')
     async assignSubCategory(
         @Param('id', ParseIntPipe) id: number,

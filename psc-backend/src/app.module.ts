@@ -25,7 +25,8 @@ import { RealtimeModule } from './realtime/realtime.module';
 import { FeedbackModule } from './feedback/feedback.module';
 import { AccountsModule } from './accounts/accounts.module';
 import { ReportsModule } from './reports/reports.module';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 
 @Module({
   imports: [
@@ -66,8 +67,8 @@ import { ThrottlerModule } from '@nestjs/throttler';
   
   controllers: [],
   providers: [MailerService, {
-    provide: 'APP_GUARD',
-    useClass: ThrottlerModule,
+    provide: APP_GUARD,
+    useClass: ThrottlerGuard,
   }],
 })
 export class AppModule { }

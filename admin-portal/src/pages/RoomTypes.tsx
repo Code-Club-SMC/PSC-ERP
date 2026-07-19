@@ -1,3 +1,4 @@
+import { usePermissionAccess } from "@/hooks/use-permissions";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,6 +48,7 @@ interface RoomType {
 }
 
 export default function RoomTypes() {
+  const { canCreate, canUpdate, canDelete } = usePermissionAccess("Room Types");
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editType, setEditType] = useState<RoomType | null>(null);
   const [deleteType, setDeleteType] = useState<RoomType | null>(null);
@@ -379,7 +381,7 @@ export default function RoomTypes() {
           </Button> */}
           <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
             <DialogTrigger asChild>
-              <Button className="gap-2">
+              <Button rbacAllowed={canCreate} className="gap-2">
                 <Plus className="h-4 w-4" /> Add Room Type
               </Button>
             </DialogTrigger>
@@ -469,7 +471,7 @@ export default function RoomTypes() {
                 <Button variant="outline" onClick={closeAddDialog}>
                   Cancel
                 </Button>
-                <Button onClick={handleAdd} disabled={createMutation.isPending}>
+                <Button rbacAllowed={canCreate} onClick={handleAdd} disabled={createMutation.isPending}>
                   {createMutation.isPending ? "Adding..." : "Add Room Type"}
                 </Button>
               </DialogFooter>
@@ -524,6 +526,7 @@ export default function RoomTypes() {
                     <div className="flex justify-end gap-2">
                       <Button
                         size="icon"
+                        rbacAllowed={canUpdate}
                         onClick={() => handleEdit(type)}
                         variant="ghost"
                       >
@@ -532,6 +535,7 @@ export default function RoomTypes() {
                       <Button
                         variant="ghost"
                         size="icon"
+                        rbacAllowed={canDelete}
                         onClick={() => setDeleteType(type)}
                       >
                         <Trash2 className="w-4 h-4" />
@@ -630,7 +634,7 @@ export default function RoomTypes() {
             <Button variant="outline" onClick={closeEditDialog}>
               Cancel
             </Button>
-            <Button onClick={handleUpdate} disabled={updateMutation.isPending}>
+            <Button rbacAllowed={canUpdate} onClick={handleUpdate} disabled={updateMutation.isPending}>
               {updateMutation.isPending ? "Updating..." : "Update Room Type"}
             </Button>
           </DialogFooter>
@@ -653,6 +657,7 @@ export default function RoomTypes() {
             </Button>
             <Button
               variant="destructive"
+              rbacAllowed={canDelete}
               onClick={() => deleteType && deleteMutation.mutate(deleteType.id)}
               disabled={deleteMutation.isPending}
             >

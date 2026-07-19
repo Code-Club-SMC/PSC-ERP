@@ -13,13 +13,12 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import type { Response } from 'express';
-import { RolesEnum } from 'src/common/constants/roles.enum';
-import { Roles } from 'src/common/decorators/roles.decorator';
 import { JwtAccGuard } from 'src/common/guards/jwt-access.guard';
-import { RolesGuard } from 'src/common/guards/roles.guard';
 import { CreateMemberDto } from './dtos/create-member.dto';
 import { MemberService } from './member.service';
 import { NotificationService } from 'src/notification/notification.service';
+import { ModuleAccess } from 'src/common/decorators/module-access.decorator';
+import { MODULES } from 'src/common/constants/modules.constants';
 
 @Controller('member')
 export class MemberController {
@@ -28,23 +27,21 @@ export class MemberController {
     private notifications: NotificationService,
   ) {}
 
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN, RolesEnum.ADMIN)
+  @ModuleAccess(MODULES.MEMBERS)
   @Post('create/member')
   async createMember(@Body() payload: CreateMemberDto, @Req() req: any) {
     const adminName = req.user?.name || 'system';
     return this.member.createMember(payload, adminName);
   }
 
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN, RolesEnum.ADMIN)
+  @ModuleAccess(MODULES.MEMBERS)
   @Post('create/bulk/members')
   async createBulkMembers(@Body() payload: CreateMemberDto[], @Req() req: any) {
     const adminName = req.user?.name || 'system';
     return this.member.createBulk(payload, adminName);
   }
 
-  @UseGuards(JwtAccGuard)
+  @ModuleAccess(MODULES.MEMBERS)
   @Patch('update/member')
   async updateMember(
     @Query('memberID') memberID: string,
@@ -55,28 +52,52 @@ export class MemberController {
     return this.member.updateMember(memberID, payload, adminName);
   }
 
+  @UseGuards(JwtAccGuard)
   @Patch('/fcm-token')
   async updateFCMToken(
-    @Query('memberID') memberID: string,
+    @Req() req: { user: { id: string } },
     @Body() payload: { fcmToken: string },
   ) {
-    return this.member.updateFCMToken(memberID, payload.fcmToken);
+    return this.member.updateFCMToken(req.user?.id, payload.fcmToken);
   }
 
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN, RolesEnum.ADMIN)
+  @ModuleAccess(MODULES.MEMBERS)
   @Delete('remove/member')
   async removeMember(@Query('memberID') memberID: string) {
     return this.member.removeMember(memberID);
   }
 
+  @ModuleAccess(MODULES.MEMBERS)
   @Get('search/members')
   async searchMembers(@Query('searchFor') searchFor: string) {
     return await this.member.searchMembers(searchFor);
   }
 
+  @ModuleAccess(MODULES.MEMBERS)
   @Get('get/members')
   async getMembers(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 50,
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+  ) {
+    return await this.member.getMembers({
+      page,
+      limit,
+      search,
+      status,
+    });
+  }
+
+  @ModuleAccess(MODULES.MEMBERS)
+  @Get('admin/search')
+  async searchMembersAdmin(@Query('searchFor') searchFor: string) {
+    return await this.member.searchMembers(searchFor);
+  }
+
+  @ModuleAccess(MODULES.MEMBERS)
+  @Get('admin/get/members')
+  async getMembersAdmin(
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 50,
     @Query('search') search?: string,

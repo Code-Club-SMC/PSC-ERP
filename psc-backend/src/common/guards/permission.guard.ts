@@ -1,32 +1,84 @@
-// permissions.guard.ts
-import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
+import { PrismaService } from 'src/prisma/prisma.service';
+import {
+  PERMISSION_ACTION_KEY,
+  PERMISSION_UPSERT_FIELD_KEY,
+  PERMISSIONS_KEY,
+} from '../decorators/permissions.decorator';
+import { RolesEnum } from '../constants/roles.enum';
+import { hasPermissionAction, PermissionAction } from '../utils/permissions';
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
-  constructor(private reflector: Reflector) {}
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly prisma: PrismaService,
+  ) {}
 
-  canActivate(context: ExecutionContext): boolean {
-    // Get required permissions from decorator
-    const requiredPermissions = this.reflector.getAllAndOverride<string[]>(
+  private inferAction(method: string): PermissionAction {
+    switch (method.toUpperCase()) {
+      case 'POST':
+        return 'create';
+      case 'PATCH':
+      case 'PUT':
+        return 'update';
+      case 'DELETE':
+        return 'delete';
+      case 'GET':
+      default:
+        return 'read';
+    }
+  }
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const requiredModules = this.reflector.getAllAndOverride<string[]>(
       PERMISSIONS_KEY,
       [context.getHandler(), context.getClass()],
     );
+    if (!requiredModules?.length) return true;
 
-    if (!requiredPermissions || requiredPermissions.length === 0) {
-      return true; // no specific permission required
+    const request = context.switchToHttp().getRequest();
+    const tokenUser = request.user;
+    const adminId = Number(tokenUser?.id);
+    if (!tokenUser || !Number.isInteger(adminId)) {
+      throw new UnauthorizedException('Invalid admin session');
     }
 
-    // Extract user from request
-    const { user } = context.switchToHttp().getRequest();
-
-    if (!user || !user.permissions.modules) {
-      return false;
+    const admin = await this.prisma.admin.findUnique({
+      where: { id: adminId },
+      select: { id: true, role: true, permissions: true },
+    });
+    if (!admin) {
+      throw new UnauthorizedException('Admin account no longer exists');
     }
-    // Check if user has *any* of the required permissions
-    return requiredPermissions.some((permission) =>
-      user.permissions.modules.includes(permission),
+
+    request.user = { ...tokenUser, role: admin.role, permissions: admin.permissions };
+    if (admin.role === RolesEnum.SUPER_ADMIN) return true;
+
+    const upsertField = this.reflector.getAllAndOverride<string>(
+      PERMISSION_UPSERT_FIELD_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+    const requiredAction: PermissionAction = upsertField
+      ? (request.body?.[upsertField] ? 'update' : 'create')
+      : this.reflector.getAllAndOverride<PermissionAction>(
+          PERMISSION_ACTION_KEY,
+          [context.getHandler(), context.getClass()],
+        ) || this.inferAction(request.method || 'GET');
+
+    if (hasPermissionAction(admin.permissions, requiredModules, requiredAction)) {
+      return true;
+    }
+
+    throw new ForbiddenException(
+      `${requiredAction.toUpperCase()} access is required for ${requiredModules.join(' or ')}`,
     );
   }
 }

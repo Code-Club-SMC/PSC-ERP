@@ -12,13 +12,15 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AccountsService } from './accounts.service';
 import { JwtAccGuard } from 'src/common/guards/jwt-access.guard';
+import { ModuleAccess } from 'src/common/decorators/module-access.decorator';
+import { MODULES } from 'src/common/constants/modules.constants';
 
 @Controller('accounts')
 export class AccountsController {
     constructor(private readonly accountsService: AccountsService) { }
 
+    @ModuleAccess(MODULES.ACCOUNTS)
     @Post('upload-bills')
-    @UseGuards(JwtAccGuard)
     @UseInterceptors(FileInterceptor('file'))
     async uploadBills(
         @Body('month') month: string,
@@ -31,6 +33,16 @@ export class AccountsController {
     @Get('bills')
     @UseGuards(JwtAccGuard)
     async getBills(
+        @Req() req: { user: { id: string } },
+        @Query('month') month?: string,
+        @Query('year') year?: string,
+    ) {
+        return this.accountsService.getBills(req.user?.id, month, year);
+    }
+
+    @ModuleAccess(MODULES.ACCOUNTS)
+    @Get('admin/bills')
+    async getBillsAdmin(
         @Query('membershipNo') membershipNo: string,
         @Query('month') month?: string,
         @Query('year') year?: string,
@@ -40,12 +52,18 @@ export class AccountsController {
 
     @Get('latest-bill')
     @UseGuards(JwtAccGuard)
-    async getLatestBill(@Query('membershipNo') membershipNo: string) {
+    async getLatestBill(@Req() req: { user: { id: string } }) {
+        return this.accountsService.getLatestBill(req.user?.id);
+    }
+
+    @ModuleAccess(MODULES.ACCOUNTS)
+    @Get('admin/latest-bill')
+    async getLatestBillAdmin(@Query('membershipNo') membershipNo: string) {
         return this.accountsService.getLatestBill(membershipNo);
     }
 
+    @ModuleAccess(MODULES.ACCOUNTS)
     @Get('list-bills')
-    @UseGuards(JwtAccGuard)
     async listBills(@Query('month') month: string, @Query('year') year: string) {
         return this.accountsService.listBills(month, year);
     }

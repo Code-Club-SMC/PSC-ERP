@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   NotFoundException,
   Param,
@@ -15,25 +16,93 @@ import {
 } from '@nestjs/common';
 import { BookingService } from './booking.service';
 import { JwtAccGuard } from 'src/common/guards/jwt-access.guard';
-import { RolesGuard } from 'src/common/guards/roles.guard';
-import { Roles } from 'src/common/decorators/roles.decorator';
-import { RolesEnum } from 'src/common/constants/roles.enum';
 import { BookingDto } from './dtos/booking.dto';
 import { PaymentMode } from '@prisma/client';
 import { ContentService } from 'src/content/content.service';
+import {
+  ActionAccess,
+  ModuleAccess,
+} from 'src/common/decorators/module-access.decorator';
+import { MODULES } from 'src/common/constants/modules.constants';
+import {
+  hasPermissionAction,
+  PermissionAction,
+} from 'src/common/utils/permissions';
+import { RolesEnum } from 'src/common/constants/roles.enum';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 @Controller('booking')
 export class BookingController {
   constructor(
     private readonly bookingService: BookingService,
     private readonly contentService: ContentService,
+    private readonly prisma: PrismaService,
   ) { }
 
+  private bookingModuleFromCategory(category?: string) {
+    switch (category) {
+      case 'Room':
+        return MODULES.ROOM_BOOKINGS;
+      case 'Hall':
+        return MODULES.HALL_BOOKINGS;
+      case 'Lawn':
+        return MODULES.LAWN_BOOKINGS;
+      case 'Photoshoot':
+        return MODULES.PHOTOSHOOT_BOOKINGS;
+      default:
+        throw new BadRequestException('Invalid booking category');
+    }
+  }
+
+  private bookingModuleFromBookingFor(bookingFor?: string) {
+    switch (bookingFor) {
+      case 'rooms':
+      case 'room_aff':
+        return MODULES.ROOM_BOOKINGS;
+      case 'halls':
+        return MODULES.HALL_BOOKINGS;
+      case 'lawns':
+        return MODULES.LAWN_BOOKINGS;
+      case 'photoshoots':
+        return MODULES.PHOTOSHOOT_BOOKINGS;
+      default:
+        throw new BadRequestException('Invalid booking type');
+    }
+  }
+
+  private async assertBookingModuleAccess(
+    req: { user?: { id?: string | number; role?: string; permissions?: unknown } },
+    moduleName: string,
+    action: PermissionAction,
+  ) {
+    const adminId = Number(req.user?.id);
+    if (!Number.isInteger(adminId)) {
+      throw new ForbiddenException('Invalid admin session');
+    }
+
+    const admin = await this.prisma.admin.findUnique({
+      where: { id: adminId },
+      select: { role: true, permissions: true },
+    });
+    if (!admin) throw new ForbiddenException('Admin account no longer exists');
+
+    req.user = { ...req.user, role: admin.role, permissions: admin.permissions };
+    if (admin.role === RolesEnum.SUPER_ADMIN) return;
+    if (hasPermissionAction(admin.permissions, [moduleName], action)) return;
+
+    throw new ForbiddenException(
+      `${action.toUpperCase()} access is required for ${moduleName}`,
+    );
+  }
+
+  @ModuleAccess(MODULES.BOOKINGS)
+  @ActionAccess('update')
   @Get('lock')
   async lockBookings() {
     return await this.bookingService.lock();
   }
 
+  @UseGuards(JwtAccGuard)
   @Get('voucher')
   async getVouchers(
     @Query('bookingType') bookingType: string,
@@ -51,8 +120,7 @@ export class BookingController {
     );
   }
 
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN, RolesEnum.ADMIN)
+  @ModuleAccess(MODULES.BOOKINGS)
   @Patch('voucher/update-status')
   async updateVoucherStatus(
     @Body() payload: { voucherId: number; status: string },
@@ -68,10 +136,14 @@ export class BookingController {
 
   // booking //
 
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN, RolesEnum.ADMIN)
+  @UseGuards(JwtAccGuard)
   @Post('create/booking')
   async createBooking(@Body() payload: BookingDto, @Req() req: any) {
+    await this.assertBookingModuleAccess(
+      req,
+      this.bookingModuleFromCategory(payload.category),
+      'create',
+    );
     const adminName = req.user?.name || 'system';
     // console.log(payload)
     if (payload.category === 'Room')
@@ -108,10 +180,14 @@ export class BookingController {
       );
   }
 
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN, RolesEnum.ADMIN)
+  @UseGuards(JwtAccGuard)
   @Patch('update/booking')
   async updateBooking(@Body() payload: Partial<BookingDto>, @Req() req: any) {
+    await this.assertBookingModuleAccess(
+      req,
+      this.bookingModuleFromCategory(payload.category),
+      'update',
+    );
     const adminName = req.user?.name || 'system';
     if (payload.category === 'Room')
       return await this.bookingService.uBookingRoom(
@@ -147,8 +223,7 @@ export class BookingController {
       );
   }
 
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN, RolesEnum.ADMIN)
+  @UseGuards(JwtAccGuard)
   @Get('get/bookings/all')
   async getBookings(
     @Query('bookingsFor') bookingFor: string,
@@ -159,7 +234,13 @@ export class BookingController {
     @Query('checkIn') checkIn?: string,
     @Query('checkOut') checkOut?: string,
     @Query('paymentStatus') paymentStatus?: string,
+    @Req() req?: any,
   ) {
+    await this.assertBookingModuleAccess(
+      req,
+      this.bookingModuleFromBookingFor(bookingFor),
+      'read',
+    );
     const search = { membershipNo, bookingId, checkIn, checkOut, paymentStatus };
     if (bookingFor === 'rooms')
       return this.bookingService.gBookingsRoom(page, limit, search);
@@ -171,8 +252,7 @@ export class BookingController {
       return this.bookingService.gBookingPhotoshoot(page, limit, search);
   }
 
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN, RolesEnum.ADMIN)
+  @UseGuards(JwtAccGuard)
   @Get('get/bookings/cancelled')
   async getCancelledBookings(
     @Query('bookingsFor') bookingFor: string,
@@ -183,7 +263,13 @@ export class BookingController {
     @Query('checkIn') checkIn?: string,
     @Query('checkOut') checkOut?: string,
     @Query('paymentStatus') paymentStatus?: string,
+    @Req() req?: any,
   ) {
+    await this.assertBookingModuleAccess(
+      req,
+      this.bookingModuleFromBookingFor(bookingFor),
+      'read',
+    );
     const search = { membershipNo, bookingId, checkIn, checkOut, paymentStatus };
     if (bookingFor === 'rooms')
       return this.bookingService.gCancelledBookingsRoom(page, limit, search);
@@ -195,8 +281,7 @@ export class BookingController {
       return this.bookingService.gCancelledBookingsPhotoshoot(page, limit, search);
   }
 
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN, RolesEnum.ADMIN)
+  @UseGuards(JwtAccGuard)
   @Get('get/bookings/cancellation-requests')
   async getCancellationRequests(
     @Query('bookingsFor') bookingFor: string,
@@ -207,7 +292,13 @@ export class BookingController {
     @Query('checkIn') checkIn?: string,
     @Query('checkOut') checkOut?: string,
     @Query('paymentStatus') paymentStatus?: string,
+    @Req() req?: any,
   ) {
+    await this.assertBookingModuleAccess(
+      req,
+      this.bookingModuleFromBookingFor(bookingFor),
+      'read',
+    );
     const search = { membershipNo, bookingId, checkIn, checkOut, paymentStatus };
     if (bookingFor === 'rooms')
       return this.bookingService.gCancellationRequestsRoom(page, limit, search);
@@ -217,8 +308,7 @@ export class BookingController {
       return this.bookingService.gCancellationRequestsLawn(page, limit, search);
   }
 
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN, RolesEnum.ADMIN)
+  @UseGuards(JwtAccGuard)
   @Get('get/bookings/closed')
   async getClosedBookings(
     @Query('bookingsFor') bookingFor: string,
@@ -229,7 +319,13 @@ export class BookingController {
     @Query('checkIn') checkIn?: string,
     @Query('checkOut') checkOut?: string,
     @Query('paymentStatus') paymentStatus?: string,
+    @Req() req?: any,
   ) {
+    await this.assertBookingModuleAccess(
+      req,
+      this.bookingModuleFromBookingFor(bookingFor),
+      'read',
+    );
     const search = { membershipNo, bookingId, checkIn, checkOut, paymentStatus };
     if (bookingFor === 'rooms')
       return this.bookingService.gClosedBookingsRoom(page, limit, search);
@@ -239,8 +335,7 @@ export class BookingController {
       return this.bookingService.gClosedBookingsLawn(page, limit, search);
   }
 
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN, RolesEnum.ADMIN)
+  @UseGuards(JwtAccGuard)
   @Post('close/booking')
   async closeBooking(
     @Query('bookingFor') bookingFor: string,
@@ -255,6 +350,11 @@ export class BookingController {
     },
     @Req() req: any,
   ) {
+    await this.assertBookingModuleAccess(
+      req,
+      this.bookingModuleFromBookingFor(bookingFor),
+      'update',
+    );
     const adminName = req.user?.name || 'system';
     const refundPayload = body.refund ? {
       paymentMode: body.paymentMode || 'CASH',
@@ -274,15 +374,32 @@ export class BookingController {
       return this.bookingService.closeBookingLawn(Number(bookID), refundPayload, adminName);
   }
 
-  // @UseGuards(JwtAccGuard)
+  @UseGuards(JwtAccGuard)
   @Post('cancelReqBooking')
   async cancelReqBooking(
     @Query('bookingFor') bookingFor: string,
     @Query('bookID') bookID: string,
     @Query('reason') reason: string,
-    @Req() req: { user: { id: string, name: string } },
+    @Req() req: { user: { id: string; name: string; role?: string } },
   ) {
-    const requestedBy = req.user?.name || 'Admin';
+    const requesterId = req.user?.id;
+    const requesterRole = req.user?.role;
+    const isAdminRequester = requesterRole === 'ADMIN' || requesterRole === 'SUPER_ADMIN';
+    const requestedBy = req.user?.name || requesterId || 'Member';
+
+    if (isAdminRequester) {
+      await this.assertBookingModuleAccess(
+        req,
+        this.bookingModuleFromBookingFor(bookingFor),
+        'delete',
+      );
+    } else {
+      await this.bookingService.assertBookingOwnership(
+        bookingFor,
+        Number(bookID),
+        requesterId,
+      );
+    }
 
     if (bookingFor === 'rooms')
       return this.bookingService.cCancellationRequestRoom(Number(bookID), reason, requestedBy);
@@ -296,15 +413,20 @@ export class BookingController {
       return this.bookingService.cCancellationRequestPhotoshoot(Number(bookID), reason, requestedBy);
   }
 
-  @UseGuards(JwtAccGuard, RolesGuard)
-  @Roles(RolesEnum.SUPER_ADMIN)
+  @UseGuards(JwtAccGuard)
   @Patch('updateCancellationReq')
   async updateCancellationReq(
     @Query('bookingFor') bookingFor: string,
     @Query('bookID') bookID: string,
     @Query('status') status: 'APPROVED' | 'REJECTED',
     @Query('remarks') remarks?: string,
+    @Req() req?: any,
   ) {
+    await this.assertBookingModuleAccess(
+      req,
+      this.bookingModuleFromBookingFor(bookingFor),
+      'update',
+    );
     return this.bookingService.updateCancellationReq(
       bookingFor,
       Number(bookID),
@@ -313,8 +435,15 @@ export class BookingController {
     );
   }
 
+  @UseGuards(JwtAccGuard)
   @Get('member/bookings')
-  async getMemberBookings(@Query('membershipNo') membershipNo: string) {
+  async getMemberBookings(@Req() req: { user: { id: string } }) {
+    return await this.bookingService.getMemberBookings(req.user?.id);
+  }
+
+  @ModuleAccess(MODULES.ACCOUNTS, MODULES.BOOKINGS)
+  @Get('admin/member/bookings')
+  async getMemberBookingsAdmin(@Query('membershipNo') membershipNo: string) {
     return await this.bookingService.getMemberBookings(membershipNo);
   }
 
@@ -325,10 +454,17 @@ export class BookingController {
   async memberBookings(
     @Req() req: { user: { id: string } },
     @Query('type') type: 'Room' | 'Hall' | 'Lawn' | 'Photoshoot',
-    @Query('membership_no') membership_no?: string,
   ) {
-    const memberId = membership_no ? membership_no : req.user?.id;
-    return await this.bookingService.memberBookings(memberId, type);
+    return await this.bookingService.memberBookings(req.user?.id, type);
+  }
+
+  @ModuleAccess(MODULES.ACCOUNTS, MODULES.BOOKINGS)
+  @Get('admin/member/bookings/all')
+  async adminMemberBookings(
+    @Query('type') type: 'Room' | 'Hall' | 'Lawn' | 'Photoshoot',
+    @Query('membership_no') membershipNo: string,
+  ) {
+    return await this.bookingService.memberBookings(membershipNo, type);
   }
 
   // fetch unpaid online vouchers for timer
@@ -364,17 +500,20 @@ export class BookingController {
   @Delete('cancel-unpaid')
   async cancelUnpaidBooking(
     @Query('consumer_number') consumer_number: string,
+    @Req() req: { user: { id: string } },
   ) {
-    return await this.bookingService.cancelUnpaidBooking(consumer_number);
+    return await this.bookingService.cancelUnpaidBooking(consumer_number, req.user?.id);
   }
 
-  // @UseGuards(JwtAccGuard)
+  @ModuleAccess(MODULES.BOOKINGS)
+  @ActionAccess('update')
   @Get('sync/guest-rooms')
   async getGuestRoomData() {
     return await this.bookingService.sync();
   }
 
-  // @UseGuards(JwtAccGuard)
+  @ModuleAccess(MODULES.BOOKINGS)
+  @ActionAccess('update')
   @Post('sync/response')
   async syncResponse(
     @Body()

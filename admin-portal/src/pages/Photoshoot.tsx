@@ -1,3 +1,4 @@
+import { usePermissionAccess } from "@/hooks/use-permissions";
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -244,6 +245,7 @@ const OutOfOrderPeriods = ({
 };
 
 export default function Photoshoot() {
+  const { canCreate, canUpdate, canDelete } = usePermissionAccess("Photoshoot");
   const [editPhotoshoot, setEditPhotoshoot] = useState<any>(null);
   const [deletePhotoshoot, setDeletePhotoshoot] = useState<any>(null);
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -543,6 +545,7 @@ export default function Photoshoot() {
         <div className="flex gap-3">
           {/* <Button
             variant="outline"
+            rbacAllowed={canUpdate}
             onClick={() => setReserveDialog(true)}
             className="gap-2"
           >
@@ -553,7 +556,7 @@ export default function Photoshoot() {
           {/* Add Dialog */}
           <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
             <DialogTrigger asChild>
-              <Button className="gap-2">
+              <Button rbacAllowed={canCreate} className="gap-2">
                 <Plus className="h-4 w-4" />
                 Add Package
               </Button>
@@ -630,7 +633,7 @@ export default function Photoshoot() {
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsAddOpen(false)}>Cancel</Button>
-                <Button onClick={handleCreate} disabled={createMutation.isPending}>
+                <Button rbacAllowed={canCreate} onClick={handleCreate} disabled={createMutation.isPending}>
                   {createMutation.isPending ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -713,6 +716,7 @@ export default function Photoshoot() {
                       <Button
                         variant="ghost"
                         size="icon"
+                        rbacAllowed={canUpdate}
                         onClick={() => setEditPhotoshoot(item)}
                         disabled={updateMutation.isPending}
                       >
@@ -721,6 +725,7 @@ export default function Photoshoot() {
                       <Button
                         variant="ghost"
                         size="icon"
+                        rbacAllowed={canDelete}
                         onClick={() => setDeletePhotoshoot(item)}
                         disabled={deleteMutation.isPending}
                       >
@@ -879,8 +884,8 @@ export default function Photoshoot() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setReserveDialog(false)}>Cancel</Button>
-            <Button onClick={handleReserve} disabled={reserveMutation.isPending}>
+            <Button variant="outline" rbacAllowed={canUpdate} onClick={() => setReserveDialog(false)}>Cancel</Button>
+            <Button rbacAllowed={canUpdate} onClick={handleReserve} disabled={reserveMutation.isPending}>
               {reserveMutation.isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -1309,7 +1314,7 @@ export default function Photoshoot() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditPhotoshoot(null)}>Cancel</Button>
             <Button
-              onClick={handleUpdate}
+              rbacAllowed={canUpdate} onClick={handleUpdate}
               disabled={updateMutation.isPending || editPhotoshoot?.isBooked}
             >
               {updateMutation.isPending ? (
@@ -1348,6 +1353,7 @@ export default function Photoshoot() {
             <Button variant="outline" onClick={() => setDeletePhotoshoot(null)}>Cancel</Button>
             <Button
               variant="destructive"
+              rbacAllowed={canDelete}
               onClick={handleDelete}
               disabled={deleteMutation.isPending || deletePhotoshoot?.isBooked}
             >
