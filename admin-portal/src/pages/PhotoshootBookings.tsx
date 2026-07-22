@@ -216,7 +216,7 @@ const PhotoshootPaymentSection = React.memo(
                 <SelectContent>
                   <SelectItem value="CASH">Cash</SelectItem>
                   <SelectItem value="CARD">Card</SelectItem>
-                  <SelectItem value="CHECK">Check</SelectItem>
+                  <SelectItem value="CHECK">Cheque</SelectItem>
                   <SelectItem value="ONLINE">Online</SelectItem>
                   <SelectItem value="KUICKPAY">KuickPay</SelectItem>
                 </SelectContent>
@@ -237,10 +237,10 @@ const PhotoshootPaymentSection = React.memo(
 
             {(form as any).paymentMode === "CHECK" && (
               <div>
-                <Label>Check Number *</Label>
+                <Label>Cheque Number *</Label>
                 <Input
                   className="mt-2"
-                  placeholder="Enter check number"
+                  placeholder="Enter cheque number"
                   value={(form as any).check_number || ""}
                   onChange={(e) => onChange("check_number" as any, e.target.value)}
                 />
@@ -303,6 +303,11 @@ const PhotoshootPaymentSection = React.memo(
 );
 
 PhotoshootPaymentSection.displayName = "PhotoshootPaymentSection";
+
+const sortBookingsChronologically = <T extends { bookingDate?: string }>(items: T[]) =>
+  [...items].sort(
+    (a, b) => new Date(a.bookingDate || 0).getTime() - new Date(b.bookingDate || 0).getTime()
+  );
 
 export default function PhotoshootBookings() {
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -420,7 +425,10 @@ export default function PhotoshootBookings() {
     },
   });
 
-  const bookings = useMemo(() => data?.pages.flat() || [], [data]);
+  const bookings = useMemo(
+    () => sortBookingsChronologically(data?.pages.flat() || []),
+    [data]
+  );
 
   const observer = useRef<IntersectionObserver>();
   const lastElementRef = useCallback(

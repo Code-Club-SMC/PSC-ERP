@@ -76,7 +76,7 @@ export interface Booking {
   pendingAmount: number;
   member?: Member;
   rooms?: any[];
-  extraCharges?: { head: string; amount: number }[];
+  extraCharges?: { head: string; amount: number; baseAmount?: number; gstPercent?: number; gstAmount?: number }[];
   cancellationRequest?: {
     reason: string;
     status: string;
@@ -150,7 +150,7 @@ export interface BookingForm {
   remarks?: string;
   generateAdvanceVoucher?: boolean;
   advanceVoucherAmount?: number;
-  heads?: { head: string; amount: number }[];
+  heads?: { head: string; amount: number; baseAmount?: number; gstPercent?: number; gstAmount?: number }[];
 }
 
 export interface Voucher {

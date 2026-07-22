@@ -36,6 +36,24 @@ export const BookingsTable = React.memo(({
   onReject,
   onViewReason,
 }: BookingsTableProps) => {
+  const getGuestInfo = (booking: Booking) => {
+    if (booking.pricingType === "member") return null;
+
+    const label =
+      booking.pricingType === "forces-guest"
+        ? "Forces Guest"
+        : booking.pricingType === "forces" || booking.pricingType === "forces-self"
+          ? "Forces Self"
+          : "Guest";
+
+    return {
+      label,
+      name: booking.guestName,
+      contact: booking.guestContact,
+      cnic: booking.guestCNIC,
+    };
+  };
+
   if (isLoading) {
     return (
       <Card>
@@ -68,6 +86,7 @@ export const BookingsTable = React.memo(({
             <TableRow>
               <TableHead>Mem #</TableHead>
               <TableHead>Room #</TableHead>
+              <TableHead>Guest / Ref</TableHead>
               <TableHead>Check-in</TableHead>
               <TableHead>Check-out</TableHead>
               <TableHead>Total Price</TableHead>
@@ -90,6 +109,31 @@ export const BookingsTable = React.memo(({
                   ) : (
                     booking.room?.roomNumber || "N/A"
                   )}
+                </TableCell>
+                <TableCell>
+                  {(() => {
+                    const guestInfo = getGuestInfo(booking);
+                    if (!guestInfo) {
+                      return <span className="text-xs text-muted-foreground">-</span>;
+                    }
+                    return (
+                      <div className="min-w-[150px] space-y-1">
+                        <Badge variant="outline" className="text-[10px]">
+                          {guestInfo.label}
+                        </Badge>
+                        {guestInfo.name ? (
+                          <div className="text-xs font-medium">{guestInfo.name}</div>
+                        ) : (
+                          <div className="text-xs text-muted-foreground">No details</div>
+                        )}
+                        {(guestInfo.contact || guestInfo.cnic) && (
+                          <div className="text-[11px] text-muted-foreground">
+                            {[guestInfo.contact, guestInfo.cnic].filter(Boolean).join(" | ")}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </TableCell>
                 <TableCell>
                   {formatDateTimeForDisplay(booking.checkIn)}

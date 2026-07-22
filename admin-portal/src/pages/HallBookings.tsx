@@ -528,6 +528,17 @@ const recalculateHeads = (basePrice: number, currentHeads: any[]) => {
   return { updatedHeads, totalExtra };
 };
 
+const sortBookingsChronologically = <T extends { bookingDate?: string; endDate?: string }>(items: T[]) =>
+  [...items].sort((a, b) => {
+    const aStart = new Date(a.bookingDate || 0).getTime();
+    const bStart = new Date(b.bookingDate || 0).getTime();
+    if (aStart !== bStart) return aStart - bStart;
+
+    const aEnd = new Date(a.endDate || a.bookingDate || 0).getTime();
+    const bEnd = new Date(b.endDate || b.bookingDate || 0).getTime();
+    return aEnd - bEnd;
+  });
+
 export default function HallBookings() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -677,11 +688,14 @@ export default function HallBookings() {
   });
 
   const bookings = useMemo(() => {
-    if (activeTab === "active") return data?.pages.flat() || [];
-    if (activeTab === "cancelled") return cancelledData?.pages.flat() || [];
-    if (activeTab === "requests") return requestData?.pages.flat() || [];
-    if (activeTab === "closed") return closedData?.pages.flat() || [];
-    return [];
+    const rows =
+      activeTab === "active" ? data?.pages.flat() || []
+        : activeTab === "cancelled" ? cancelledData?.pages.flat() || []
+          : activeTab === "requests" ? requestData?.pages.flat() || []
+            : activeTab === "closed" ? closedData?.pages.flat() || []
+              : [];
+
+    return sortBookingsChronologically(rows);
   }, [data, cancelledData, requestData, closedData, activeTab]);
 
   const isLoading = isLoadingBookings || isLoadingCancelled || isLoadingRequests || isLoadingClosed;
@@ -1248,21 +1262,6 @@ export default function HallBookings() {
       return;
     }
 
-    // Validate booking date
-    const bookingDate = parseLocalDate(form.bookingDate);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    if (bookingDate < today && editForm.bookingDate === "") {
-      // console.log(editForm)
-      toast({
-        title: "Invalid booking date",
-        description: "Booking date cannot be in the past",
-        variant: "destructive",
-      });
-      return;
-    }
-
     // Validate paid amount for half-paid status
     if (form.paymentStatus === "HALF_PAID" && form.paidAmount <= 0) {
       toast({
@@ -1754,11 +1753,6 @@ export default function HallBookings() {
                             }
                           }}
                           numberOfMonths={2}
-                          disabled={(date) => {
-                            const today = new Date();
-                            today.setHours(0, 0, 0, 0);
-                            return date < today;
-                          }}
                           modifiers={calendarModifiers}
                           modifiersClassNames={{
                             today: "border-2 border-primary bg-transparent text-primary hover:bg-transparent hover:text-primary",
@@ -2542,11 +2536,6 @@ export default function HallBookings() {
                         }
                       }}
                       numberOfMonths={2}
-                      disabled={(date) => {
-                        const today = new Date();
-                        today.setHours(0, 0, 0, 0);
-                        return date < today;
-                      }}
                     />
                   </PopoverContent>
                 </Popover>

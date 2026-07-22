@@ -58,7 +58,7 @@ export function BookingPaymentSummaryCard({
         </div>
         <div>
           <div className="text-muted-foreground">Mode</div>
-          <div className="font-medium">{paymentMode || "CASH"}</div>
+          <div className="font-medium">{paymentMode?.toLowerCase() === "check" ? "Cheque" : "CASH"}</div>
         </div>
         <div>
           <div className="text-muted-foreground">Transaction</div>

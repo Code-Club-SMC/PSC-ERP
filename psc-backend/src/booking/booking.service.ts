@@ -38,6 +38,74 @@ export class BookingService {
     private notificationService: NotificationService,
   ) { }
 
+  private applyRoomListDateFilters(
+    args: any,
+    search?: { checkIn?: string; checkOut?: string },
+  ) {
+    const hasExplicitDateFilter = !!(search?.checkIn || search?.checkOut);
+
+    if (search?.checkIn) {
+      const d = new Date(search.checkIn);
+      d.setHours(0, 0, 0, 0);
+      const dEnd = new Date(search.checkIn);
+      dEnd.setHours(23, 59, 59, 999);
+      args.where.checkIn = { gte: d, lte: dEnd };
+    }
+
+    if (search?.checkOut) {
+      const d = new Date(search.checkOut);
+      d.setHours(0, 0, 0, 0);
+      const dEnd = new Date(search.checkOut);
+      dEnd.setHours(23, 59, 59, 999);
+      args.where.checkOut = { gte: d, lte: dEnd };
+    }
+
+    if (!hasExplicitDateFilter) {
+      const today = getPakistanDate();
+      today.setHours(0, 0, 0, 0);
+      args.where.checkOut = { gte: today };
+    }
+  }
+
+  private setDayFilter(args: any, field: string, date: string) {
+    const start = new Date(date);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(date);
+    end.setHours(23, 59, 59, 999);
+    args.where[field] = { gte: start, lte: end };
+  }
+
+  private applyBookingDateListFilters(
+    args: any,
+    search?: { checkIn?: string; checkOut?: string },
+    dateField = 'bookingDate',
+    endField?: string,
+  ) {
+    const hasExplicitDateFilter = !!(search?.checkIn || search?.checkOut);
+
+    if (search?.checkIn) {
+      this.setDayFilter(args, dateField, search.checkIn);
+    }
+
+    if (search?.checkOut && endField) {
+      this.setDayFilter(args, endField, search.checkOut);
+    }
+
+    if (!hasExplicitDateFilter) {
+      const today = getPakistanDate();
+      today.setHours(0, 0, 0, 0);
+      if (endField) {
+        args.where.OR = [
+          ...(args.where.OR || []),
+          { [endField]: { gte: today } },
+          { [dateField]: { gte: today } },
+        ];
+      } else {
+        args.where[dateField] = { gte: today };
+      }
+    }
+  }
+
   private formatHallBookingRemarks(
     hallName: string,
     startDate: Date,
@@ -288,13 +356,8 @@ export class BookingService {
     const now = getPakistanDate();
     now.setHours(0, 0, 0, 0);
 
-    const normalizedCheckIn = new Date(checkInDate);
-    normalizedCheckIn.setHours(0, 0, 0, 0);
-
     if (!checkIn || !checkOut || checkInDate >= checkOutDate)
       throw new ConflictException('Check-in must be before check-out');
-    if (normalizedCheckIn < now)
-      throw new ConflictException('Check-in date cannot be in the past');
     if (numberOfAdults < 1)
       throw new ConflictException('At least one adult is required');
     if (numberOfAdults + numberOfChildren > 6)
@@ -1223,7 +1286,7 @@ export class BookingService {
           none: { status: 'PENDING' }
         }
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ checkIn: 'asc' }, { checkOut: 'asc' }],
       include: {
         cancellationRequests: true,
         rooms: {
@@ -1259,20 +1322,7 @@ export class BookingService {
     if (search?.membershipNo) {
       args.where.Membership_No = { contains: search.membershipNo };
     }
-    if (search?.checkIn) {
-      const d = new Date(search.checkIn);
-      d.setHours(0, 0, 0, 0);
-      const dEnd = new Date(search.checkIn);
-      dEnd.setHours(23, 59, 59, 999);
-      args.where.checkIn = { gte: d, lte: dEnd };
-    }
-    if (search?.checkOut) {
-      const d = new Date(search.checkOut);
-      d.setHours(0, 0, 0, 0);
-      const dEnd = new Date(search.checkOut);
-      dEnd.setHours(23, 59, 59, 999);
-      args.where.checkOut = { gte: d, lte: dEnd };
-    }
+    this.applyRoomListDateFilters(args, search);
     if (search?.paymentStatus && search.paymentStatus !== 'ALL') {
       args.where.paymentStatus = search.paymentStatus;
     }
@@ -1289,7 +1339,7 @@ export class BookingService {
   async gCancelledBookingsRoom(page?: number, limit?: number, search?: { membershipNo?: string; bookingId?: number; checkIn?: string; checkOut?: string; paymentStatus?: string }) {
     const args: any = {
       where: { isCancelled: true },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ checkIn: 'asc' }, { checkOut: 'asc' }],
       include: {
         rooms: {
           include: {
@@ -1325,20 +1375,7 @@ export class BookingService {
     if (search?.membershipNo) {
       args.where.Membership_No = { contains: search.membershipNo };
     }
-    if (search?.checkIn) {
-      const d = new Date(search.checkIn);
-      d.setHours(0, 0, 0, 0);
-      const dEnd = new Date(search.checkIn);
-      dEnd.setHours(23, 59, 59, 999);
-      args.where.checkIn = { gte: d, lte: dEnd };
-    }
-    if (search?.checkOut) {
-      const d = new Date(search.checkOut);
-      d.setHours(0, 0, 0, 0);
-      const dEnd = new Date(search.checkOut);
-      dEnd.setHours(23, 59, 59, 999);
-      args.where.checkOut = { gte: d, lte: dEnd };
-    }
+    this.applyRoomListDateFilters(args, search);
     if (search?.paymentStatus && search.paymentStatus !== 'ALL') {
       args.where.paymentStatus = search.paymentStatus;
     }
@@ -1362,7 +1399,7 @@ export class BookingService {
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ checkIn: 'asc' }, { checkOut: 'asc' }],
       include: {
         rooms: {
           include: {
@@ -1398,20 +1435,7 @@ export class BookingService {
     if (search?.membershipNo) {
       args.where.Membership_No = { contains: search.membershipNo };
     }
-    if (search?.checkIn) {
-      const d = new Date(search.checkIn);
-      d.setHours(0, 0, 0, 0);
-      const dEnd = new Date(search.checkIn);
-      dEnd.setHours(23, 59, 59, 999);
-      args.where.checkIn = { gte: d, lte: dEnd };
-    }
-    if (search?.checkOut) {
-      const d = new Date(search.checkOut);
-      d.setHours(0, 0, 0, 0);
-      const dEnd = new Date(search.checkOut);
-      dEnd.setHours(23, 59, 59, 999);
-      args.where.checkOut = { gte: d, lte: dEnd };
-    }
+    this.applyRoomListDateFilters(args, search);
     if (search?.paymentStatus && search.paymentStatus !== 'ALL') {
       args.where.paymentStatus = search.paymentStatus;
     }
@@ -1428,7 +1452,7 @@ export class BookingService {
   async gClosedBookingsRoom(page?: number, limit?: number, search?: { membershipNo?: string; bookingId?: number; checkIn?: string; checkOut?: string; paymentStatus?: string }) {
     const args: any = {
       where: { isClosed: true, isCancelled: false },
-      orderBy: { updatedAt: 'desc' },
+      orderBy: [{ checkIn: 'asc' }, { checkOut: 'asc' }],
       include: {
         rooms: {
           include: {
@@ -1464,20 +1488,7 @@ export class BookingService {
     if (search?.membershipNo) {
       args.where.Membership_No = { contains: search.membershipNo };
     }
-    if (search?.checkIn) {
-      const d = new Date(search.checkIn);
-      d.setHours(0, 0, 0, 0);
-      const dEnd = new Date(search.checkIn);
-      dEnd.setHours(23, 59, 59, 999);
-      args.where.checkIn = { gte: d, lte: dEnd };
-    }
-    if (search?.checkOut) {
-      const d = new Date(search.checkOut);
-      d.setHours(0, 0, 0, 0);
-      const dEnd = new Date(search.checkOut);
-      dEnd.setHours(23, 59, 59, 999);
-      args.where.checkOut = { gte: d, lte: dEnd };
-    }
+    this.applyRoomListDateFilters(args, search);
     if (search?.paymentStatus && search.paymentStatus !== 'ALL') {
       args.where.paymentStatus = search.paymentStatus;
     }
@@ -1579,7 +1590,7 @@ export class BookingService {
   async gClosedBookingsHall(page?: number, limit?: number, search?: { membershipNo?: string; bookingId?: number; checkIn?: string; checkOut?: string; paymentStatus?: string }) {
     const args: any = {
       where: { isClosed: true, isCancelled: false },
-      orderBy: { updatedAt: 'desc' },
+      orderBy: [{ bookingDate: 'asc' }, { endDate: 'asc' }],
       include: {
         hall: true,
         member: {
@@ -1603,20 +1614,7 @@ export class BookingService {
     if (search?.membershipNo) {
       args.where.Membership_No = { contains: search.membershipNo };
     }
-    if (search?.checkIn) {
-      const d = new Date(search.checkIn);
-      d.setHours(0, 0, 0, 0);
-      const dEnd = new Date(search.checkIn);
-      dEnd.setHours(23, 59, 59, 999);
-      args.where.checkIn = { gte: d, lte: dEnd };
-    }
-    if (search?.checkOut) {
-      const d = new Date(search.checkOut);
-      d.setHours(0, 0, 0, 0);
-      const dEnd = new Date(search.checkOut);
-      dEnd.setHours(23, 59, 59, 999);
-      args.where.checkOut = { gte: d, lte: dEnd };
-    }
+    this.applyBookingDateListFilters(args, search, 'bookingDate', 'endDate');
     if (search?.paymentStatus && search.paymentStatus !== 'ALL') {
       args.where.paymentStatus = search.paymentStatus;
     }
@@ -1711,7 +1709,7 @@ export class BookingService {
   async gClosedBookingsLawn(page?: number, limit?: number, search?: { membershipNo?: string; bookingId?: number; checkIn?: string; checkOut?: string; paymentStatus?: string }) {
     const args: any = {
       where: { isClosed: true, isCancelled: false },
-      orderBy: { updatedAt: 'desc' },
+      orderBy: [{ bookingDate: 'asc' }, { endDate: 'asc' }],
       include: {
         lawn: true,
         member: {
@@ -1735,20 +1733,7 @@ export class BookingService {
     if (search?.membershipNo) {
       args.where.member = { Membership_No: { contains: search.membershipNo } };
     }
-    if (search?.checkIn) {
-      const d = new Date(search.checkIn);
-      d.setHours(0, 0, 0, 0);
-      const dEnd = new Date(search.checkIn);
-      dEnd.setHours(23, 59, 59, 999);
-      args.where.bookingDate = { gte: d, lte: dEnd };
-    }
-    if (search?.checkOut) {
-      const d = new Date(search.checkOut);
-      d.setHours(0, 0, 0, 0);
-      const dEnd = new Date(search.checkOut);
-      dEnd.setHours(23, 59, 59, 999);
-      args.where.endDate = { gte: d, lte: dEnd };
-    }
+    this.applyBookingDateListFilters(args, search, 'bookingDate', 'endDate');
     if (search?.paymentStatus && search.paymentStatus !== 'ALL') {
       args.where.paymentStatus = search.paymentStatus;
     }
@@ -1927,7 +1912,7 @@ export class BookingService {
   async gCancelledBookingsHall(page?: number, limit?: number, search?: { membershipNo?: string; bookingId?: number; checkIn?: string; checkOut?: string; paymentStatus?: string }) {
     const args: any = {
       where: { isCancelled: true },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ bookingDate: 'asc' }, { endDate: 'asc' }],
       include: {
         hall: true,
         member: {
@@ -1951,20 +1936,7 @@ export class BookingService {
     if (search?.membershipNo) {
       args.where.Membership_No = { contains: search.membershipNo };
     }
-    if (search?.checkIn) {
-      const d = new Date(search.checkIn);
-      d.setHours(0, 0, 0, 0);
-      const dEnd = new Date(search.checkIn);
-      dEnd.setHours(23, 59, 59, 999);
-      args.where.checkIn = { gte: d, lte: dEnd };
-    }
-    if (search?.checkOut) {
-      const d = new Date(search.checkOut);
-      d.setHours(0, 0, 0, 0);
-      const dEnd = new Date(search.checkOut);
-      dEnd.setHours(23, 59, 59, 999);
-      args.where.checkOut = { gte: d, lte: dEnd };
-    }
+    this.applyBookingDateListFilters(args, search, 'bookingDate', 'endDate');
     if (search?.paymentStatus && search.paymentStatus !== 'ALL') {
       args.where.paymentStatus = search.paymentStatus;
     }
@@ -1988,7 +1960,7 @@ export class BookingService {
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ bookingDate: 'asc' }, { endDate: 'asc' }],
       include: {
         hall: true,
         member: {
@@ -2012,20 +1984,7 @@ export class BookingService {
     if (search?.membershipNo) {
       args.where.Membership_No = { contains: search.membershipNo };
     }
-    if (search?.checkIn) {
-      const d = new Date(search.checkIn);
-      d.setHours(0, 0, 0, 0);
-      const dEnd = new Date(search.checkIn);
-      dEnd.setHours(23, 59, 59, 999);
-      args.where.checkIn = { gte: d, lte: dEnd };
-    }
-    if (search?.checkOut) {
-      const d = new Date(search.checkOut);
-      d.setHours(0, 0, 0, 0);
-      const dEnd = new Date(search.checkOut);
-      dEnd.setHours(23, 59, 59, 999);
-      args.where.checkOut = { gte: d, lte: dEnd };
-    }
+    this.applyBookingDateListFilters(args, search, 'bookingDate', 'endDate');
     if (search?.paymentStatus && search.paymentStatus !== 'ALL') {
       args.where.paymentStatus = search.paymentStatus;
     }
@@ -2042,7 +2001,7 @@ export class BookingService {
   async gCancelledBookingsLawn(page?: number, limit?: number, search?: { membershipNo?: string; bookingId?: number; checkIn?: string; checkOut?: string; paymentStatus?: string }) {
     const args: any = {
       where: { isCancelled: true },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ bookingDate: 'asc' }, { endDate: 'asc' }],
       include: {
         lawn: {
           include: { lawnCategory: true },
@@ -2068,20 +2027,7 @@ export class BookingService {
     if (search?.membershipNo) {
       args.where.member = { Membership_No: { contains: search.membershipNo } };
     }
-    if (search?.checkIn) {
-      const d = new Date(search.checkIn);
-      d.setHours(0, 0, 0, 0);
-      const dEnd = new Date(search.checkIn);
-      dEnd.setHours(23, 59, 59, 999);
-      args.where.bookingDate = { gte: d, lte: dEnd };
-    }
-    if (search?.checkOut) {
-      const d = new Date(search.checkOut);
-      d.setHours(0, 0, 0, 0);
-      const dEnd = new Date(search.checkOut);
-      dEnd.setHours(23, 59, 59, 999);
-      args.where.endDate = { gte: d, lte: dEnd };
-    }
+    this.applyBookingDateListFilters(args, search, 'bookingDate', 'endDate');
     if (search?.paymentStatus && search.paymentStatus !== 'ALL') {
       args.where.paymentStatus = search.paymentStatus;
     }
@@ -2105,7 +2051,7 @@ export class BookingService {
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ bookingDate: 'asc' }, { endDate: 'asc' }],
       include: {
         lawn: {
           include: { lawnCategory: true },
@@ -2131,20 +2077,7 @@ export class BookingService {
     if (search?.membershipNo) {
       args.where.member = { Membership_No: { contains: search.membershipNo } };
     }
-    if (search?.checkIn) {
-      const d = new Date(search.checkIn);
-      d.setHours(0, 0, 0, 0);
-      const dEnd = new Date(search.checkIn);
-      dEnd.setHours(23, 59, 59, 999);
-      args.where.bookingDate = { gte: d, lte: dEnd };
-    }
-    if (search?.checkOut) {
-      const d = new Date(search.checkOut);
-      d.setHours(0, 0, 0, 0);
-      const dEnd = new Date(search.checkOut);
-      dEnd.setHours(23, 59, 59, 999);
-      args.where.endDate = { gte: d, lte: dEnd };
-    }
+    this.applyBookingDateListFilters(args, search, 'bookingDate', 'endDate');
     if (search?.paymentStatus && search.paymentStatus !== 'ALL') {
       args.where.paymentStatus = search.paymentStatus;
     }
@@ -3240,9 +3173,7 @@ export class BookingService {
           none: { status: 'PENDING' }
         }
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: [{ bookingDate: 'asc' }, { endDate: 'asc' }],
       include: {
         cancellationRequests: true,
         hall: {
@@ -3272,20 +3203,7 @@ export class BookingService {
     if (search?.membershipNo) {
       args.where.Membership_No = { contains: search.membershipNo };
     }
-    if (search?.checkIn) {
-      const d = new Date(search.checkIn);
-      d.setHours(0, 0, 0, 0);
-      const dEnd = new Date(search.checkIn);
-      dEnd.setHours(23, 59, 59, 999);
-      args.where.checkIn = { gte: d, lte: dEnd };
-    }
-    if (search?.checkOut) {
-      const d = new Date(search.checkOut);
-      d.setHours(0, 0, 0, 0);
-      const dEnd = new Date(search.checkOut);
-      dEnd.setHours(23, 59, 59, 999);
-      args.where.checkOut = { gte: d, lte: dEnd };
-    }
+    this.applyBookingDateListFilters(args, search, 'bookingDate', 'endDate');
     if (search?.paymentStatus && search.paymentStatus !== 'ALL') {
       args.where.paymentStatus = search.paymentStatus;
     }
@@ -3435,9 +3353,6 @@ export class BookingService {
     const booking = new Date(bookingDate);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-
-    if (booking < today)
-      throw new UnprocessableEntityException('Booking date cannot be in past');
 
     // Resolve End Date
     const endDate = endDateInput ? new Date(endDateInput) : new Date(booking);
@@ -4293,7 +4208,7 @@ export class BookingService {
           none: { status: 'PENDING' }
         }
       },
-      orderBy: { bookingDate: 'desc' },
+      orderBy: [{ bookingDate: 'asc' }, { endDate: 'asc' }],
       include: {
         cancellationRequests: true,
         lawn: { include: { lawnCategory: true } },
@@ -4309,20 +4224,7 @@ export class BookingService {
     if (search?.membershipNo) {
       args.where.member = { Membership_No: { contains: search.membershipNo } };
     }
-    if (search?.checkIn) {
-      const d = new Date(search.checkIn);
-      d.setHours(0, 0, 0, 0);
-      const dEnd = new Date(search.checkIn);
-      dEnd.setHours(23, 59, 59, 999);
-      args.where.bookingDate = { gte: d, lte: dEnd };
-    }
-    if (search?.checkOut) {
-      const d = new Date(search.checkOut);
-      d.setHours(0, 0, 0, 0);
-      const dEnd = new Date(search.checkOut);
-      dEnd.setHours(23, 59, 59, 999);
-      args.where.endDate = { gte: d, lte: dEnd };
-    }
+    this.applyBookingDateListFilters(args, search, 'bookingDate', 'endDate');
     if (search?.paymentStatus && search.paymentStatus !== 'ALL') {
       args.where.paymentStatus = search.paymentStatus;
     }
@@ -4371,11 +4273,6 @@ export class BookingService {
       throw new BadRequestException('Required fields missing');
 
     const booking = new Date(bookingDate);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    if (booking < today)
-      throw new UnprocessableEntityException('Booking date cannot be in past');
 
     // Resolve End Date
     const endDate = endDateInput ? new Date(endDateInput) : new Date(booking);
@@ -5231,26 +5128,6 @@ export class BookingService {
     // FIXED: Extract date part properly
     const bookingDate = new Date(startTime);
 
-    const now = new Date();
-
-    // Check if booking datetime is in the past
-    // Allow small buffer (e.g. 1 min) for "now" bookings or just check date part
-    // If strict time check is needed, ensure it allows current time
-    if (startTime.getTime() < now.getTime() - 60000) {
-      // Allow 1 min grace
-      // But if it is today, maybe we allow it?
-      // Let's just ensure date is not yesterday
-      const bookingDateOnly = new Date(startTime);
-      bookingDateOnly.setHours(0, 0, 0, 0);
-      const todayDateOnly = new Date(now);
-      todayDateOnly.setHours(0, 0, 0, 0);
-
-      if (bookingDateOnly < todayDateOnly) {
-        throw new ConflictException('Booking date cannot be in the past');
-      }
-      // If same day, allow it (admin might be backdating slightly or exact time)
-    }
-
     // Validate time slot is between 9am and 6pm (since booking is 2 hours, last slot ends at 8pm)
     // Validate time slot is between 9am and 6pm
     const bookingHour = startTime.getHours();
@@ -5744,7 +5621,7 @@ export class BookingService {
           none: { status: 'PENDING' }
         }
       },
-      orderBy: { bookingDate: 'asc' }, // The original was asc? usually desc for recent.. keeping as original
+      orderBy: { bookingDate: 'asc' },
       include: {
         member: {
           select: {
@@ -5764,13 +5641,7 @@ export class BookingService {
     if (search?.membershipNo) {
       args.where.member = { Membership_No: { contains: search.membershipNo } };
     }
-    if (search?.checkIn) {
-      const d = new Date(search.checkIn);
-      d.setHours(0, 0, 0, 0);
-      const dEnd = new Date(search.checkIn);
-      dEnd.setHours(23, 59, 59, 999);
-      args.where.bookingDate = { gte: d, lte: dEnd };
-    }
+    this.applyBookingDateListFilters(args, search, 'bookingDate');
     if (search?.paymentStatus && search.paymentStatus !== 'ALL') {
       args.where.paymentStatus = search.paymentStatus;
     }
@@ -5789,7 +5660,7 @@ export class BookingService {
       where: {
         isCancelled: true,
       },
-      orderBy: { updatedAt: 'desc' },
+      orderBy: { bookingDate: 'asc' },
       include: {
         member: {
           select: {
@@ -5809,13 +5680,7 @@ export class BookingService {
     if (search?.membershipNo) {
       args.where.member = { Membership_No: { contains: search.membershipNo } };
     }
-    if (search?.checkIn) {
-      const d = new Date(search.checkIn);
-      d.setHours(0, 0, 0, 0);
-      const dEnd = new Date(search.checkIn);
-      dEnd.setHours(23, 59, 59, 999);
-      args.where.bookingDate = { gte: d, lte: dEnd };
-    }
+    this.applyBookingDateListFilters(args, search, 'bookingDate');
     if (search?.paymentStatus && search.paymentStatus !== 'ALL') {
       args.where.paymentStatus = search.paymentStatus;
     }

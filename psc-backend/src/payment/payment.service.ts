@@ -1147,23 +1147,6 @@ export class PaymentService {
     if (member?.Status !== 'active')
       throw new UnprocessableEntityException(`Cannot book for inactive member`);
 
-    // ── CHECK RECENT BOOKINGS (24h Limit) ──────────────────
-    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const recentHall = await this.prismaService.hallBooking.findFirst({
-      where: { memberId: member.Sno, createdAt: { gte: twentyFourHoursAgo }, isCancelled: false },
-    });
-    const recentLawn = await this.prismaService.lawnBooking.findFirst({
-      where: { memberId: member.Sno, createdAt: { gte: twentyFourHoursAgo }, isCancelled: false },
-    });
-
-    if (recentHall || recentLawn) {
-      const type = recentHall ? 'Hall' : 'Lawn';
-      throw new BadRequestException(
-        `You have already made a ${type} booking within the last 24 hours. PSC policy allows only one Hall or Lawn booking every 24 hours.`,
-      );
-    }
-
-
     // ── 1. VALIDATE HALL EXISTS ─────────────────────────────
     const hallExists = await this.prismaService.hall.findFirst({
       where: { id: hallId },
@@ -1465,23 +1448,6 @@ export class PaymentService {
     });
     if (member?.Status !== 'active')
       throw new UnprocessableEntityException(`Cannot book for inactive member`);
-
-    // ── CHECK RECENT BOOKINGS (24h Limit) ──────────────────
-    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const recentHall = await this.prismaService.hallBooking.findFirst({
-      where: { memberId: member.Sno, createdAt: { gte: twentyFourHoursAgo }, isCancelled: false },
-    });
-    const recentLawn = await this.prismaService.lawnBooking.findFirst({
-      where: { memberId: member.Sno, createdAt: { gte: twentyFourHoursAgo }, isCancelled: false },
-    });
-
-    if (recentHall || recentLawn) {
-      const type = recentHall ? 'Hall' : 'Lawn';
-      throw new BadRequestException(
-        `You have already made a ${type} booking within the last 24 hours. PSC policy allows only one Hall or Lawn booking every 24 hours.`,
-      );
-    }
-
 
     // ── 1. VALIDATE LAWN EXISTS ─────────────────────────────
     const lawnExists = await this.prismaService.lawn.findFirst({

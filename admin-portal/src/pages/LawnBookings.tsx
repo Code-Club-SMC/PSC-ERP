@@ -348,7 +348,7 @@ const LawnPaymentSection = React.memo(
 
             {form.paymentMode === "CHECK" && (
               <div>
-                <Label>Check Number *</Label>
+                <Label>Cheque Number *</Label>
                 <Input
                   className="mt-2"
                   placeholder="Enter check number"
@@ -708,6 +708,17 @@ const recalculateHeads = (basePrice: number, currentHeads: { head: string; amoun
   return { updatedHeads, totalExtra };
 };
 
+const sortBookingsChronologically = <T extends { bookingDate?: string; endDate?: string }>(items: T[]) =>
+  [...items].sort((a, b) => {
+    const aStart = new Date(a.bookingDate || 0).getTime();
+    const bStart = new Date(b.bookingDate || 0).getTime();
+    if (aStart !== bStart) return aStart - bStart;
+
+    const aEnd = new Date(a.endDate || a.bookingDate || 0).getTime();
+    const bEnd = new Date(b.endDate || b.bookingDate || 0).getTime();
+    return aEnd - bEnd;
+  });
+
 export default function LawnBookings() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -899,11 +910,14 @@ export default function LawnBookings() {
   });
 
   const lawnBookings = useMemo(() => {
-    if (activeTab === "active") return activeData?.pages.flat() || [];
-    if (activeTab === "cancelled") return cancelledData?.pages.flat() || [];
-    if (activeTab === "closed") return closedData?.pages.flat() || [];
-    if (activeTab === "requests") return requestsData?.pages.flat() || [];
-    return [];
+    const rows =
+      activeTab === "active" ? activeData?.pages.flat() || []
+        : activeTab === "cancelled" ? cancelledData?.pages.flat() || []
+          : activeTab === "closed" ? closedData?.pages.flat() || []
+            : activeTab === "requests" ? requestsData?.pages.flat() || []
+              : [];
+
+    return sortBookingsChronologically(rows);
   }, [activeTab, activeData, cancelledData, closedData, requestsData]);
 
   const isLoadingBookings = activeTab === "active" ? isLoadingActive
@@ -1934,9 +1948,6 @@ export default function LawnBookings() {
                               handleFormChange("bookingDetails", []);
                             }
                           }}
-                          disabled={(date) =>
-                            date < new Date(new Date().setHours(0, 0, 0, 0))
-                          }
                           modifiers={calendarModifiers}
                           modifiersClassNames={{
                             today: "border-2 border-primary bg-transparent text-primary hover:bg-transparent hover:text-primary",
@@ -2512,7 +2523,6 @@ export default function LawnBookings() {
                   }}
                   className="w-full h-10 bg-muted/30 border-none shadow-none"
                   placeholder="Select booking dates"
-                  minDate={new Date()}
                 />
               </div>
 

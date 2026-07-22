@@ -74,11 +74,29 @@ export const BookingFormComponent = React.memo(({
 
   const [localSelectedHead, setLocalSelectedHead] = React.useState<string>("");
   const [localHeadAmount, setLocalHeadAmount] = React.useState<string>("");
+  const [localHeadGstPercent, setLocalHeadGstPercent] = React.useState<string>("");
 
-  const isArmedForces =
-    selectedMember?.memberType === "ARMED_FORCES" ||
-    ["forces", "forces-self", "forces-guest"].includes(form.pricingType);
-  const isPricingForces = ["forces", "forces-self", "forces-guest"].includes(form.pricingType);
+  const forcesPricingTypes = ["forces", "forces-self", "forces-guest"];
+  const isSelectedMemberArmedForces = selectedMember?.memberType === "ARMED_FORCES";
+  const isForcesGuestOfArmedMember = isSelectedMemberArmedForces && form.pricingType === "guest";
+  const isForcesPricingContext =
+    forcesPricingTypes.includes(form.pricingType) || isForcesGuestOfArmedMember;
+  const primaryPricingType = isForcesPricingContext ? "forces" : form.pricingType;
+  const forcesRelationType = form.pricingType === "forces" ? "forces-self" : form.pricingType;
+  const showGuestOrPaDetails = form.pricingType === "guest" || form.pricingType === "forces-guest";
+  const showPaReferenceDetails = form.pricingType === "forces-guest";
+
+  const handlePrimaryPricingChange = (value: string) => {
+    if (value === "forces") {
+      onChange("pricingType", "forces-self");
+      return;
+    }
+    onChange("pricingType", value);
+  };
+
+  const handleForcesRelationChange = (value: string) => {
+    onChange("pricingType", value);
+  };
 
   const canAddHead = localSelectedHead && parseFloat(localHeadAmount) > 0;
 
@@ -132,23 +150,35 @@ export const BookingFormComponent = React.memo(({
         <div className={cn("col-span-12", !isEdit ? "md:col-span-4" : "md:col-span-6")}>
           <Label className="text-sm font-semibold text-slate-700">Pricing Type</Label>
           <Select
-            value={form.pricingType}
-            onValueChange={(val) => onChange("pricingType", val)}
+            value={primaryPricingType}
+            onValueChange={handlePrimaryPricingChange}
           >
             <SelectTrigger className="mt-2 bg-white border-slate-200 focus:ring-blue-50 focus:border-blue-400">
               <SelectValue placeholder="Select pricing" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="member" disabled={isArmedForces}>Member</SelectItem>
+              <SelectItem value="member">Member</SelectItem>
               <SelectItem value="guest">Guest</SelectItem>
-              {isArmedForces ? (
-                <>
-                  <SelectItem value="forces-self">Forces -- Self</SelectItem>
-                  <SelectItem value="forces-guest">Forces -- Guest</SelectItem>
-                </>
-              ) : (
-                <SelectItem value="forces">Forces</SelectItem>
-              )}
+              <SelectItem value="forces">Forces</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {!isAffiliated && isForcesPricingContext && (
+        <div className={cn("col-span-12", !isEdit ? "md:col-span-4" : "md:col-span-6")}>
+          <Label className="text-sm font-semibold text-slate-700">Forces Relation</Label>
+          <Select
+            value={forcesRelationType}
+            onValueChange={handleForcesRelationChange}
+          >
+            <SelectTrigger className="mt-2 bg-white border-slate-200 focus:ring-blue-50 focus:border-blue-400">
+              <SelectValue placeholder="Select relation" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="forces-self">Forces Self</SelectItem>
+              <SelectItem value="forces-guest">Forces Guest</SelectItem>
+              <SelectItem value="guest">Guest</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -214,17 +244,17 @@ export const BookingFormComponent = React.memo(({
       </div>
 
       {/* Row 3: Guest / Forces Info (Conditional) */}
-      {(form.pricingType === "guest" || form.pricingType === "forces" || form.pricingType === "forces-guest") && (
+      {showGuestOrPaDetails && (
         <div className="col-span-12 grid grid-cols-1 md:grid-cols-3 gap-4 border p-4 rounded-lg bg-gray-50/50">
           <div className="col-span-3">
             <h4 className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-2">
               <Info className="h-4 w-4" />
-              {(isPricingForces || form.pricingType === "forces-guest") ? "PA Reference Details" : "Guest Information"}
+              {showPaReferenceDetails ? "PA Reference Details" : "Guest Information"}
             </h4>
           </div>
           <div>
             <FormInput
-              label={(isPricingForces || form.pricingType === "forces-guest") ? "PA Ref Name *" : "Guest Name *"}
+              label={showPaReferenceDetails ? "PA Ref Name *" : "Guest Name *"}
               type="text"
               value={form.guestName}
               onChange={(val) => onChange("guestName", val)}
@@ -232,7 +262,7 @@ export const BookingFormComponent = React.memo(({
           </div>
           <div>
             <FormInput
-              label={(isPricingForces || form.pricingType === "forces-guest") ? "PA Ref Contact" : "Guest Contact"}
+              label={showPaReferenceDetails ? "PA Ref Contact" : "Guest Contact"}
               type="number"
               value={form.guestContact}
               onChange={(val) => onChange("guestContact", val)}
@@ -241,7 +271,7 @@ export const BookingFormComponent = React.memo(({
           </div>
           <div>
             <FormInput
-              label={(isPricingForces || form.pricingType === "forces-guest") ? "PA Ref CNIC" : "Guest CNIC"}
+              label={showPaReferenceDetails ? "PA Ref CNIC" : "Guest CNIC"}
               type="text"
               value={form.guestCNIC || ""}
               onChange={(val) => onChange("guestCNIC", val)}
@@ -324,11 +354,6 @@ export const BookingFormComponent = React.memo(({
                 reserved: "bg-amber-100 border-amber-200 text-amber-900 font-semibold rounded-none",
                 outOfOrder: "bg-red-100 border-red-200 text-red-900 font-semibold rounded-none",
               }}
-              disabled={(date) => {
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                return date < today;
-              }}
             />
           </PopoverContent>
         </Popover>
@@ -376,13 +401,14 @@ export const BookingFormComponent = React.memo(({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-          <div className="md:col-span-4">
+          <div className="md:col-span-3">
             <Label className="text-[11px] font-bold text-slate-500 mb-1.5 block uppercase tracking-tight">Select Charge Type</Label>
             <Select
               value={localSelectedHead}
               onValueChange={(val) => {
                 setLocalSelectedHead(val);
                 setLocalHeadAmount("");
+                setLocalHeadGstPercent("");
               }}
             >
               <SelectTrigger className="bg-white border-slate-200 h-10 shadow-none focus:ring-blue-100">
@@ -393,13 +419,12 @@ export const BookingFormComponent = React.memo(({
                 <SelectItem value="Mattress">Extra Mattress</SelectItem>
                 <SelectItem value="Laundry">Laundry Services</SelectItem>
                 <SelectItem value="SVC">Service Charges (SVC)</SelectItem>
-                <SelectItem value="GST">GST Tax (%)</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="md:col-span-3">
-            <Label className="text-[11px] font-bold text-slate-500 mb-1.5 block uppercase tracking-tight">Amount / Percent</Label>
+            <Label className="text-[11px] font-bold text-slate-500 mb-1.5 block uppercase tracking-tight">Base Amount</Label>
             <div className="relative">
               <Input
                 type="number"
@@ -409,7 +434,24 @@ export const BookingFormComponent = React.memo(({
                 onChange={(e) => setLocalHeadAmount(e.target.value)}
               />
               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium text-xs">
-                {localSelectedHead === "GST" ? "%" : "Rs."}
+                Rs.
+              </div>
+            </div>
+          </div>
+
+          <div className="md:col-span-2">
+            <Label className="text-[11px] font-bold text-slate-500 mb-1.5 block uppercase tracking-tight">GST %</Label>
+            <div className="flex h-10 overflow-hidden rounded-[5px] border border-slate-200 bg-white focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100">
+              <Input
+                type="number"
+                placeholder="0"
+                min="0"
+                className="h-full min-w-0 flex-1 rounded-none border-0 bg-white px-3 text-sm shadow-none focus-visible:ring-0"
+                value={localHeadGstPercent}
+                onChange={(e) => setLocalHeadGstPercent(e.target.value)}
+              />
+              <div className="flex h-full w-10 shrink-0 items-center justify-center border-l border-slate-100 bg-slate-50 text-xs font-semibold text-slate-500">
+                %
               </div>
             </div>
           </div>
@@ -422,23 +464,23 @@ export const BookingFormComponent = React.memo(({
               disabled={!canAddHead}
               onClick={() => {
                 const head = localSelectedHead || "Extra Charge";
-                const amount = parseFloat(localHeadAmount || "0");
+                const baseAmount = parseFloat(localHeadAmount || "0");
+                const gstPercent = Math.max(0, parseFloat(localHeadGstPercent || "0") || 0);
 
-                if (amount <= 0) return;
+                if (baseAmount <= 0) return;
 
-                let finalAmount = amount;
-                if (head === "GST") {
-                  finalAmount = (Number(form.totalPrice || 0) * amount) / 100;
-                }
+                const gstAmount = Number(((baseAmount * gstPercent) / 100).toFixed(2));
+                const finalAmount = Number((baseAmount + gstAmount).toFixed(2));
 
-                const newHeads = [...(form.heads || []), { head, amount: finalAmount }];
+                const newHeads = [
+                  ...(form.heads || []),
+                  { head, amount: finalAmount, baseAmount, gstPercent, gstAmount },
+                ];
                 onChange("heads", newHeads);
 
-                // Update Total Price - Ensure numeric addition
-                const currentTotal = Number(form.totalPrice) || 0;
-                onChange("totalPrice", currentTotal + finalAmount);
                 setLocalSelectedHead("");
                 setLocalHeadAmount("");
+                setLocalHeadGstPercent("");
               }}
             >
               Add
@@ -448,7 +490,7 @@ export const BookingFormComponent = React.memo(({
           <div className="md:col-span-3 pb-1.5">
             <div className="flex items-start gap-2 text-[10px] text-slate-500 bg-white/50 border border-slate-100 p-2 rounded-lg leading-tight italic">
               <Info className="h-3 w-3 text-amber-500 shrink-0 mt-0.5" />
-              <span>GST is calculated as % of Current Total Booking Price</span>
+              <span>GST is calculated per head, then included in that head's final amount.</span>
             </div>
           </div>
         </div>
@@ -463,7 +505,12 @@ export const BookingFormComponent = React.memo(({
                     {h.head}
                   </div>
                   <div className="bg-white px-3 py-1.5 text-xs font-mono font-medium text-slate-700">
-                    PKR {h.amount.toLocaleString()}
+                    PKR {Number(h.amount || 0).toLocaleString()}
+                    {Number(h.gstPercent || 0) > 0 && (
+                      <span className="ml-1 text-[10px] font-sans text-slate-400">
+                        ({Number(h.baseAmount || 0).toLocaleString()} + GST {h.gstPercent}%)
+                      </span>
+                    )}
                   </div>
                   <button
                     type="button"
@@ -471,9 +518,6 @@ export const BookingFormComponent = React.memo(({
                     onClick={() => {
                       const newHeads = form.heads?.filter((_, i) => i !== idx);
                       onChange("heads", newHeads);
-                      // Ensure numeric subtraction
-                      const currentTotal = Number(form.totalPrice) || 0;
-                      onChange("totalPrice", Math.max(0, currentTotal - h.amount));
                     }}
                   >
                     <X className="h-3.5 w-3.5" />

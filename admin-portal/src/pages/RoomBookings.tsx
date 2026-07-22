@@ -85,7 +85,7 @@ import {
   calculateAdvanceDetails,
 } from "@/utils/bookingUtils";
 import { parseLocalDate } from "@/utils/hallBookingUtils";
-import { format, startOfDay, addYears } from "date-fns";
+import { format, startOfDay, addYears, subYears } from "date-fns";
 import { BookingDetailsCard } from "@/components/details/RoomBookingDets";
 import { hasModuleAction } from "@/utils/permissions";
 
@@ -258,11 +258,22 @@ export default function RoomBookings() {
   });
 
   const bookings = useMemo(() => {
-    if (activeTab === "active") return data?.pages.flat() || [];
-    if (activeTab === "cancelled") return cancelledData?.pages.flat() || [];
-    if (activeTab === "requests") return requestData?.pages.flat() || [];
-    if (activeTab === "closed") return closedData?.pages.flat() || [];
-    return [];
+    const tabBookings =
+      activeTab === "active"
+        ? data?.pages.flat() || []
+        : activeTab === "cancelled"
+          ? cancelledData?.pages.flat() || []
+          : activeTab === "requests"
+            ? requestData?.pages.flat() || []
+            : activeTab === "closed"
+              ? closedData?.pages.flat() || []
+              : [];
+
+    return [...tabBookings].sort((a, b) => {
+      const checkInDiff = new Date(a.checkIn).getTime() - new Date(b.checkIn).getTime();
+      if (checkInDiff !== 0) return checkInDiff;
+      return new Date(a.checkOut).getTime() - new Date(b.checkOut).getTime();
+    });
   }, [data, cancelledData, requestData, closedData, activeTab]);
 
   const isLoading = isLoadingBookings || isLoadingCancelled || isLoadingRequests || isLoadingClosed;
@@ -317,7 +328,7 @@ export default function RoomBookings() {
     enabled: false,
   });
 
-  // Fetch date statuses for selected room(s) - fetch 1 year from today
+  // Fetch date statuses for selected room(s), including historical bookings.
   const targetRoomIds = useMemo(() => {
     const ids: string[] = [];
     if (form.roomId) ids.push(form.roomId);
@@ -328,10 +339,10 @@ export default function RoomBookings() {
   }, [form.roomId, selectedRoomIds, editForm.roomId]);
 
   const { data: fetchedStatuses } = useQuery({
-    queryKey: ["roomDateStatuses", "upcoming", targetRoomIds.join(",")],
+    queryKey: ["roomDateStatuses", "room-history-window", targetRoomIds.join(",")],
     queryFn: async () => {
-      const from = format(new Date(), "yyyy-MM-dd");
-      const to = format(addYears(new Date(), 1), "yyyy-MM-dd"); // Fetch 1 year
+      const from = format(subYears(new Date(), 5), "yyyy-MM-dd");
+      const to = format(addYears(new Date(), 1), "yyyy-MM-dd");
       return await getRoomDateStatuses(from, to, targetRoomIds);
     },
     enabled: targetRoomIds.length > 0,
@@ -712,13 +723,7 @@ export default function RoomBookings() {
   const calculateTotal = (roomTypeId: string, pricingType: string, checkIn: string, checkOut: string, roomCount: number, heads: any[] = []) => {
     if (!roomTypeId || !checkIn || !checkOut || roomCount === 0) return 0;
 
-    // If pricing type is "member" and selected member is Armed Forces, use "forces" pricing instead
-    let effectivePricingType = pricingType;
-    if (pricingType === "member" && selectedMember?.memberType === "ARMED_FORCES") {
-      effectivePricingType = "forces";
-    }
-
-    const basePrice = calculatePrice(roomTypeId, effectivePricingType, checkIn, checkOut, roomTypes);
+    const basePrice = calculatePrice(roomTypeId, pricingType, checkIn, checkOut, roomTypes);
     const headsTotal = heads.reduce((sum, h) => sum + (Number(h.amount) || 0), 0);
     return (basePrice * roomCount) + headsTotal;
   };
