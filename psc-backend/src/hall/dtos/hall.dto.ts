@@ -1,4 +1,9 @@
-import { IsNotEmpty, IsOptional } from 'class-validator';
+import { IsNotEmpty, IsOptional, Matches } from 'class-validator';
+import {
+  NON_NEGATIVE_DECIMAL_PATTERN,
+  NON_NEGATIVE_INTEGER_PATTERN,
+  VALIDATION_MESSAGES,
+} from 'src/common/validation/patterns';
 
 export class OutOfOrderPeriod {
   @IsOptional()
@@ -26,12 +31,16 @@ export class HallDto {
   description?: string;
 
   @IsNotEmpty({ message: 'hall capacity must be provided' })
+  @Matches(NON_NEGATIVE_INTEGER_PATTERN, { message: VALIDATION_MESSAGES.integer })
   capacity: string;
   @IsNotEmpty({ message: 'hall charges for members must be provided' })
+  @Matches(NON_NEGATIVE_DECIMAL_PATTERN, { message: VALIDATION_MESSAGES.decimal })
   chargesMembers: string;
   @IsNotEmpty({ message: 'hall charges for guests must be provided' })
+  @Matches(NON_NEGATIVE_DECIMAL_PATTERN, { message: VALIDATION_MESSAGES.decimal })
   chargesGuests: string;
   @IsOptional()
+  @Matches(NON_NEGATIVE_DECIMAL_PATTERN, { message: VALIDATION_MESSAGES.decimal })
   chargesCorporate?: string;
 
   @IsNotEmpty({message: "order for hall must be provided"})

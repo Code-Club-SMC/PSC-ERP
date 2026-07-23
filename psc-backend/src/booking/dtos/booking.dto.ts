@@ -1,5 +1,12 @@
 import { PaymentMode, PaymentStatus } from '@prisma/client';
-import { IsEnum, IsNotEmpty, IsOptional } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, Matches, MaxLength } from 'class-validator';
+import {
+  CNIC_PATTERN,
+  NON_NEGATIVE_DECIMAL_PATTERN,
+  NON_NEGATIVE_INTEGER_PATTERN,
+  PAKISTAN_PHONE_PATTERN,
+  VALIDATION_MESSAGES,
+} from 'src/common/validation/patterns';
 
 // enum PaymentMode {
 //     CASH,
@@ -36,6 +43,7 @@ export class BookingDto {
   @IsOptional()
   photoshootTime?: string | null;
   @IsOptional()
+  @Matches(NON_NEGATIVE_INTEGER_PATTERN, { message: VALIDATION_MESSAGES.integer })
   guestsCount?: string | null;
   @IsOptional()
   numberOfGuests?: number;
@@ -49,11 +57,14 @@ export class BookingDto {
   @IsOptional()
   guestName?: string;
   @IsOptional()
+  @Matches(PAKISTAN_PHONE_PATTERN, { message: VALIDATION_MESSAGES.phone })
   guestContact?: string;
   @IsOptional()
+  @Matches(CNIC_PATTERN, { message: VALIDATION_MESSAGES.cnic })
   guestCNIC?: string;
 
   @IsNotEmpty({ message: 'Total Price must be specified' })
+  @Matches(NON_NEGATIVE_DECIMAL_PATTERN, { message: VALIDATION_MESSAGES.decimal })
   totalPrice: string;
   @IsEnum(PaymentStatus, {
     message: 'Payment status must be UNPAID, HALF_PAID, PAID, or TO_BILL',
@@ -81,8 +92,10 @@ export class BookingDto {
   @IsOptional()
   card_number?: string;
   @IsOptional()
+  @Matches(NON_NEGATIVE_INTEGER_PATTERN, { message: VALIDATION_MESSAGES.integer })
   check_number?: string;
   @IsOptional()
+  @MaxLength(120, { message: 'Bank name cannot exceed 120 characters' })
   bank_name?: string;
   @IsOptional()
   generateAdvanceVoucher?: boolean;
@@ -93,6 +106,7 @@ export class BookingDto {
   @IsOptional()
   isForced?: boolean;
   @IsOptional()
+  @MaxLength(120, { message: 'Transaction ID cannot exceed 120 characters' })
   transaction_id?: string;
   @IsOptional()
   paid_at?: string;

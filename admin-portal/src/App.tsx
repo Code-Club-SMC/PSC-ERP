@@ -38,6 +38,7 @@ import RoomReports from "./pages/reports/RoomReports";
 import HallReports from "./pages/reports/HallReports";
 import PhotoshootReports from "./pages/reports/PhotoshootReports";
 import { canReadModule, ModuleName } from "@/utils/permissions";
+import { GlobalInputValidation } from "@/components/GlobalInputValidation";
 
 
 const queryClient = new QueryClient();
@@ -312,6 +313,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
+        <GlobalInputValidation />
         <Toaster />
         <Sonner />
         <BrowserRouter>

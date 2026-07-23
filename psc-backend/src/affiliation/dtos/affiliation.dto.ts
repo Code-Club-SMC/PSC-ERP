@@ -6,8 +6,19 @@ import {
   IsNumber,
   IsEnum,
   IsNotEmpty,
+  Matches,
+  MaxLength,
+  Min,
 } from 'class-validator';
 import { PaymentMode, PaymentStatus } from '@prisma/client';
+import {
+  CNIC_PATTERN,
+  EMAIL_WITH_MIN_LOCAL_PATTERN,
+  NON_NEGATIVE_DECIMAL_PATTERN,
+  NON_NEGATIVE_INTEGER_PATTERN,
+  PAKISTAN_PHONE_PATTERN,
+  VALIDATION_MESSAGES,
+} from 'src/common/validation/patterns';
 
 export class CreateAffiliatedClubDto {
   @IsString()
@@ -19,10 +30,12 @@ export class CreateAffiliatedClubDto {
 
   @IsOptional()
   @IsString()
+  @Matches(PAKISTAN_PHONE_PATTERN, { message: VALIDATION_MESSAGES.phone })
   contactNo?: string;
 
   @IsOptional()
   @IsString()
+  @Matches(EMAIL_WITH_MIN_LOCAL_PATTERN, { message: VALIDATION_MESSAGES.email })
   email?: string;
 
   @IsOptional()
@@ -60,10 +73,12 @@ export class UpdateAffiliatedClubDto {
 
   @IsOptional()
   @IsString()
+  @Matches(PAKISTAN_PHONE_PATTERN, { message: VALIDATION_MESSAGES.phone })
   contactNo?: string;
 
   @IsOptional()
   @IsString()
+  @Matches(EMAIL_WITH_MIN_LOCAL_PATTERN, { message: VALIDATION_MESSAGES.email })
   email?: string;
 
   @IsOptional()
@@ -138,6 +153,7 @@ export class AffiliatedRoomBookingDto {
   affiliatedMembershipNo: string;
 
   @IsNotEmpty({ message: 'Total Price must be specified' })
+  @Matches(NON_NEGATIVE_DECIMAL_PATTERN, { message: VALIDATION_MESSAGES.decimal })
   totalPrice: string;
 
   @IsEnum(PaymentStatus, {
@@ -163,21 +179,30 @@ export class AffiliatedRoomBookingDto {
   selectedRoomIds?: string[];
 
   @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
   numberOfAdults?: number;
 
   @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
   numberOfChildren?: number;
 
   @IsOptional()
   specialRequests?: string;
 
   @IsOptional()
+  @MaxLength(120, { message: 'Guest name cannot exceed 120 characters' })
   guestName?: string;
 
   @IsOptional()
+  @Matches(PAKISTAN_PHONE_PATTERN, { message: VALIDATION_MESSAGES.phone })
   guestContact?: string;
 
   @IsOptional()
+  @Matches(CNIC_PATTERN, { message: VALIDATION_MESSAGES.cnic })
   guestCNIC?: string;
 
   @IsOptional()
@@ -185,9 +210,11 @@ export class AffiliatedRoomBookingDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(120, { message: 'Transaction ID cannot exceed 120 characters' })
   transaction_id?: string;
   @IsOptional()
   @IsString()
+  @MaxLength(120, { message: 'Bank name cannot exceed 120 characters' })
   bank_name?: string;
   @IsOptional()
   @IsString()
@@ -195,10 +222,12 @@ export class AffiliatedRoomBookingDto {
 
   @IsOptional()
   @IsString()
+  @Matches(NON_NEGATIVE_INTEGER_PATTERN, { message: VALIDATION_MESSAGES.integer })
   card_number?: string;
 
   @IsOptional()
   @IsString()
+  @Matches(NON_NEGATIVE_INTEGER_PATTERN, { message: VALIDATION_MESSAGES.integer })
   check_number?: string;
 }
 
