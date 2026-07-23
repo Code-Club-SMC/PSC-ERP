@@ -141,12 +141,16 @@ export class AffiliationController {
     @Query('limit') limit?: string,
     @Query('clubId') clubId?: string,
     @Query('status') status?: 'ACTIVE' | 'CANCELLED' | 'REQUESTS' | 'CLOSED',
+    @Query('checkIn') checkIn?: string,
+    @Query('checkOut') checkOut?: string,
   ) {
     return await this.affiliationService.getAffiliatedRoomBookings(
       page ? Number(page) : 1,
       limit ? Number(limit) : 10,
       clubId ? Number(clubId) : undefined,
       status,
+      checkIn,
+      checkOut,
     );
   }
 

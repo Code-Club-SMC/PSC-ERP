@@ -1899,15 +1899,19 @@ export const getAffiliatedRoomBookings = async ({
   limit = 10,
   clubId,
   status,
+  checkIn,
+  checkOut,
 }: {
   page?: number;
   limit?: number;
   clubId?: number;
   status?: string;
+  checkIn?: string;
+  checkOut?: string;
 }): Promise<any> => {
   try {
     const response = await axios.get(`${base_url}/affiliation/bookings`, {
-      params: { page, limit, clubId, status },
+      params: { page, limit, clubId, status, checkIn, checkOut },
       withCredentials: true,
     });
     return response.data;

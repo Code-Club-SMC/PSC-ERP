@@ -1,5 +1,5 @@
 import { usePermissionAccess } from "@/hooks/use-permissions";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -53,6 +53,8 @@ import { VouchersDialog } from "@/components/VouchersDialog";
 import { CancelBookingDialog } from "@/components/CancelBookingDialog";
 import { CloseBookingDialog } from "@/components/CloseBookingDialog";
 import { BookingFormComponent } from "@/components/BookingForm";
+import { BookingPaymentDialog } from "@/components/BookingPaymentDialog";
+import { PaymentSection } from "@/components/PaymentSection";
 // Import types and utilities
 import {
   Booking,
@@ -91,6 +93,9 @@ export default function AffiliatedClubs() {
 
   // ─── Room Booking State (shared BookingForm) ──────────────
   const [bookingDialog, setBookingDialog] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [createPaymentDialogOpen, setCreatePaymentDialogOpen] = useState(false);
+  const [editPaymentDialogOpen, setEditPaymentDialogOpen] = useState(false);
   const [editBooking, setEditBooking] = useState<Booking | null>(null);
   const [viewVouchers, setViewVouchers] = useState<Booking | null>(null);
   const [cancelBooking, setCancelBooking] = useState<Booking | null>(null);
@@ -98,6 +103,7 @@ export default function AffiliatedClubs() {
   const [detailBooking, setDetailBooking] = useState<Booking | null>(null);
   const [bookingPage, setBookingPage] = useState(1);
   const [bookingTab, setBookingTab] = useState("ACTIVE");
+  const [bookingDateFilters, setBookingDateFilters] = useState({ checkIn: "", checkOut: "" });
 
   const [form, setForm] = useState<BookingForm>(affInitialForm);
   const [editForm, setEditForm] = useState<BookingForm>(affInitialForm);
@@ -144,9 +150,24 @@ export default function AffiliatedClubs() {
   });
 
   const { data: affiliatedBookings, isLoading: isLoadingBookings } = useQuery({
-    queryKey: ["affiliatedBookings", bookingPage, bookingTab],
-    queryFn: () => getAffiliatedRoomBookings({ page: bookingPage, limit: 10, status: bookingTab }),
+    queryKey: ["affiliatedBookings", bookingPage, bookingTab, bookingDateFilters.checkIn, bookingDateFilters.checkOut],
+    queryFn: () => getAffiliatedRoomBookings({
+      page: bookingPage,
+      limit: 10,
+      status: bookingTab,
+      checkIn: bookingDateFilters.checkIn || undefined,
+      checkOut: bookingDateFilters.checkOut || undefined,
+    }),
   });
+
+  const sortedAffiliatedBookings = useMemo(() => {
+    const rows = affiliatedBookings?.data || [];
+    return [...rows].sort((a, b) => {
+      const checkInDiff = new Date(a.checkIn).getTime() - new Date(b.checkIn).getTime();
+      if (checkInDiff !== 0) return checkInDiff;
+      return new Date(a.checkOut).getTime() - new Date(b.checkOut).getTime();
+    });
+  }, [affiliatedBookings?.data]);
 
   const { data: bookingVouchers = [], isLoading: isLoadingVouchers } = useQuery<any[]>({
     queryKey: ["vouchers", viewVouchers?.id],
@@ -199,6 +220,7 @@ export default function AffiliatedClubs() {
     mutationFn: createAffiliatedRoomBooking,
     onSuccess: () => {
       toast({ title: "Room booking created successfully" });
+      setCreatePaymentDialogOpen(false);
       setBookingDialog(false);
       resetBookingForm();
       queryClient.invalidateQueries({ queryKey: ["affiliatedBookings"] });
@@ -210,6 +232,8 @@ export default function AffiliatedClubs() {
     mutationFn: ({ id, data }: { id: number; data: unknown }) => updateAffiliatedRoomBooking(id, data),
     onSuccess: () => {
       toast({ title: "Booking updated successfully" });
+      setEditPaymentDialogOpen(false);
+      setEditDialogOpen(false);
       setEditBooking(null);
       queryClient.invalidateQueries({ queryKey: ["affiliatedBookings"] });
     },
@@ -247,13 +271,15 @@ export default function AffiliatedClubs() {
 
   const resetEditForm = useCallback(() => {
     setEditForm(affInitialForm);
+    setEditDialogOpen(false);
+    setEditPaymentDialogOpen(false);
     setEditBooking(null);
     setSelectedRoomIds([]);
     setAffClubId("");
     setAffMembershipNo("");
   }, []);
 
-  const handleEditBooking = useCallback((booking: Booking) => {
+  const handleEditBooking = useCallback((booking: Booking, openDialog = true) => {
     setEditBooking(booking);
     setEditForm({
       ...initialFormState,
@@ -284,6 +310,7 @@ export default function AffiliatedClubs() {
     setAffClubId(booking.affiliatedClubId?.toString() || "");
     setAffMembershipNo(booking.affiliatedMembershipNo || "");
     setSelectedRoomIds(booking.rooms.map((r: { roomId: number }) => r.roomId.toString()));
+    setEditDialogOpen(openDialog);
   }, []);
 
   // ─── Club Handlers ────────────────────────────────────────
@@ -393,6 +420,23 @@ export default function AffiliatedClubs() {
       },
     });
   }, [editBooking, editForm, updateBookingMutation, sanitizeAffPayload]);
+
+  const handleSaveEditPayment = useCallback(() => {
+    if (!editBooking) return;
+    if (!affClubId || !affMembershipNo.trim() || selectedRoomIds.length === 0) {
+      return toast({
+        title: "Booking details are not ready yet",
+        description: "Please try again in a moment",
+        variant: "destructive",
+      });
+    }
+    handleUpdate();
+  }, [editBooking, affClubId, affMembershipNo, selectedRoomIds.length, handleUpdate, toast]);
+
+  const openEditPaymentDialog = useCallback((booking: Booking) => {
+    handleEditBooking(booking, false);
+    setEditPaymentDialogOpen(true);
+  }, [handleEditBooking]);
 
   // Form field change handler — guest pricing is always auto-applied
   const handleFormChange = useCallback((field: keyof BookingForm, value: BookingForm[keyof BookingForm], isEdit = false) => {
@@ -1055,15 +1099,57 @@ export default function AffiliatedClubs() {
             </TabsList>
           </Tabs>
 
+          <Card>
+            <CardContent className="p-4">
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-4 items-end">
+                <div className="space-y-2">
+                  <Label>Check-In Date</Label>
+                  <Input
+                    type="date"
+                    value={bookingDateFilters.checkIn}
+                    onChange={(event) => {
+                      setBookingDateFilters((prev) => ({ ...prev, checkIn: event.target.value }));
+                      setBookingPage(1);
+                    }}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Check-Out Date</Label>
+                  <Input
+                    type="date"
+                    value={bookingDateFilters.checkOut}
+                    onChange={(event) => {
+                      setBookingDateFilters((prev) => ({ ...prev, checkOut: event.target.value }));
+                      setBookingPage(1);
+                    }}
+                  />
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setBookingDateFilters({ checkIn: "", checkOut: "" });
+                    setBookingPage(1);
+                  }}
+                >
+                  Clear Dates
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-3">
+                Active bookings show today and upcoming dates by default. Use date filters to fetch previous bookings.
+              </p>
+            </CardContent>
+          </Card>
+
           <div className="space-y-4">
             <BookingsTable
-              bookings={affiliatedBookings?.data || []}
+              bookings={sortedAffiliatedBookings}
               isLoading={isLoadingBookings}
               onDetail={(booking) => setDetailBooking(booking)}
               onEdit={canUpdate && bookingTab !== "CLOSED" ? (booking) => handleEditBooking(booking) : undefined}
               onCancel={canDelete && bookingTab !== "CLOSED" ? (booking) => setCancelBooking(booking) : undefined}
               onClose={canUpdate && bookingTab === "ACTIVE" ? (booking) => setCloseBookingTarget(booking) : undefined}
               onViewVouchers={(booking) => setViewVouchers(booking)}
+              onRecordPayment={canUpdate && bookingTab === "ACTIVE" ? openEditPaymentDialog : undefined}
               getPaymentBadge={getPaymentBadge}
             />
             {affiliatedBookings?.lastPage > 1 && (
@@ -1310,6 +1396,8 @@ export default function AffiliatedClubs() {
             selectedRoomIds={selectedRoomIds}
             onRoomSelection={(roomId) => handleRoomSelection(roomId)}
             isAffiliated={true}
+            showPaymentSection={false}
+            onOpenPaymentDialog={canCreate ? () => setCreatePaymentDialogOpen(true) : undefined}
           />
 
           <DialogFooter>
@@ -1375,6 +1463,7 @@ export default function AffiliatedClubs() {
       </Dialog>
 
       <EditBookingDialog
+        open={editDialogOpen && !!editBooking}
         editBooking={editBooking}
         editForm={editForm}
         onEditFormChange={(field, value) => handleFormChange(field, value, true)}
@@ -1383,17 +1472,52 @@ export default function AffiliatedClubs() {
         isLoadingRoomTypes={false}
         dateStatuses={[]}
         onUpdate={handleUpdate}
-        onClose={() => setEditBooking(null)}
+        onClose={resetEditForm}
         isUpdating={updateBookingMutation.isPending}
         selectedRoomIds={selectedRoomIds}
         onRoomSelection={(roomId) => handleRoomSelection(roomId)}
         isAffiliated={true}
+        showPaymentSection={false}
+        onOpenPaymentDialog={canUpdate ? () => setEditPaymentDialogOpen(true) : undefined}
         affClubId={affClubId}
         setAffClubId={setAffClubId}
         affMembershipNo={affMembershipNo}
         setAffMembershipNo={setAffMembershipNo}
         clubs={clubs}
       />
+
+      <BookingPaymentDialog
+        open={createPaymentDialogOpen}
+        onOpenChange={setCreatePaymentDialogOpen}
+        title="Record Payment (New Affiliated Room Booking)"
+        description="Apply payment details for this affiliated booking before final create."
+        onSave={() => setCreatePaymentDialogOpen(false)}
+        saveLabel="Use Payment Details"
+      >
+        <PaymentSection
+          form={form}
+          onChange={handleFormChange}
+          roomCount={selectedRoomIds.length || (form.roomId ? 1 : 0)}
+          isAffiliated={true}
+        />
+      </BookingPaymentDialog>
+
+      <BookingPaymentDialog
+        open={editPaymentDialogOpen && !!editBooking}
+        onOpenChange={setEditPaymentDialogOpen}
+        title={`Record Payment (Affiliated Room Booking #${editBooking?.id ?? ""})`}
+        description="Save payment/transaction changes without using the edit form."
+        onSave={handleSaveEditPayment}
+        isSaving={updateBookingMutation.isPending}
+      >
+        <PaymentSection
+          form={editForm}
+          onChange={(field, value) => handleFormChange(field, value, true)}
+          isEdit={true}
+          roomCount={selectedRoomIds.length || (editForm.roomId ? 1 : 0)}
+          isAffiliated={true}
+        />
+      </BookingPaymentDialog>
 
       <VouchersDialog
         viewVouchers={viewVouchers}

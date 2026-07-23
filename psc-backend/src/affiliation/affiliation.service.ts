@@ -362,7 +362,14 @@ export class AffiliationService {
 
   // -------------------- AFFILIATED CLUB ROOM BOOKINGS --------------------
 
-  async getAffiliatedRoomBookings(page = 1, limit = 10, clubId?: number, status?: 'ACTIVE' | 'CANCELLED' | 'REQUESTS' | 'CLOSED') {
+  async getAffiliatedRoomBookings(
+    page = 1,
+    limit = 10,
+    clubId?: number,
+    status?: 'ACTIVE' | 'CANCELLED' | 'REQUESTS' | 'CLOSED',
+    checkIn?: string,
+    checkOut?: string,
+  ) {
     const where: any = {};
     if (clubId) where.affiliatedClubId = clubId;
 
@@ -385,13 +392,36 @@ export class AffiliationService {
       where.isCancelled = false;
     }
 
+    const dateFilters: any[] = [];
+    const hasDateFilter = Boolean(checkIn || checkOut);
+
+    if (checkIn) {
+      const fromDate = new Date(checkIn);
+      fromDate.setHours(0, 0, 0, 0);
+      dateFilters.push({ checkIn: { gte: fromDate } });
+    }
+
+    if (checkOut) {
+      const toDate = new Date(checkOut);
+      toDate.setHours(23, 59, 59, 999);
+      dateFilters.push({ checkOut: { lte: toDate } });
+    }
+
+    if (!hasDateFilter && status === 'ACTIVE') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      dateFilters.push({ checkOut: { gte: today } });
+    }
+
+    if (dateFilters.length) where.AND = [...(where.AND || []), ...dateFilters];
+
     const [total, data] = await Promise.all([
       this.prismaService.affClubBooking.count({ where }),
       this.prismaService.affClubBooking.findMany({
         where,
         skip: (page - 1) * limit,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ checkIn: 'asc' }, { checkOut: 'asc' }],
         include: {
           affiliatedClub: true,
           cancellationRequests: true,
