@@ -5,11 +5,11 @@ import { PrismaModule } from 'src/prisma/prisma.module';
 import { MailerModule } from 'src/mailer/mailer.module';
 import { CloudinaryModule } from 'src/cloudinary/cloudinary.module';
 import { BookingModule } from 'src/booking/booking.module';
+import { ActivityNotificationsModule } from 'src/activity-notifications/activity-notifications.module';
 
 @Module({
-  imports: [PrismaModule, MailerModule, CloudinaryModule, BookingModule],
+  imports: [PrismaModule, MailerModule, CloudinaryModule, BookingModule, ActivityNotificationsModule],
   controllers: [AffiliationController],
   providers: [AffiliationService],
 })
 export class AffiliationModule { }
-

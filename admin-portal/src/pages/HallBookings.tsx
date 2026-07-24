@@ -605,6 +605,12 @@ export default function HallBookings() {
     isSuperAdmin ||
     hasModuleAction(currentUser?.permissions, "Hall Bookings", "delete");
   const location = useLocation();
+  useEffect(() => {
+    const tab = new URLSearchParams(location.search).get("tab");
+    if (tab && ["active", "requests", "cancelled", "closed"].includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, [location.search]);
 
 
   // API Queries

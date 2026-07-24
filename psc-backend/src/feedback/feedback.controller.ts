@@ -40,8 +40,9 @@ export class FeedbackController {
     async updateStatus(
         @Param('id', ParseIntPipe) id: number,
         @Body() dto: UpdateFeedbackStatusDto,
+        @Req() req: any,
     ) {
-        return this.feedbackService.updateStatus(id, dto.status);
+        return this.feedbackService.updateStatus(id, dto.status, req.user?.name || 'system');
     }
 
     @ModuleAccess(MODULES.FEEDBACK)
@@ -50,8 +51,9 @@ export class FeedbackController {
     async addRemark(
         @Param('id', ParseIntPipe) id: number,
         @Body() dto: AddFeedbackRemarkDto,
+        @Req() req: any,
     ) {
-        return this.feedbackService.addRemark(id, dto);
+        return this.feedbackService.addRemark(id, dto, req.user?.name || dto.adminName || 'system');
     }
 
     // Categories

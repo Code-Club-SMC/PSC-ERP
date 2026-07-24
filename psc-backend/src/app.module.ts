@@ -25,6 +25,7 @@ import { RealtimeModule } from './realtime/realtime.module';
 import { FeedbackModule } from './feedback/feedback.module';
 import { AccountsModule } from './accounts/accounts.module';
 import { ReportsModule } from './reports/reports.module';
+import { ActivityNotificationsModule } from './activity-notifications/activity-notifications.module';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 
@@ -57,6 +58,7 @@ import { APP_GUARD } from '@nestjs/core';
     FeedbackModule,
     AccountsModule,
     ReportsModule,
+    ActivityNotificationsModule,
     ThrottlerModule.forRoot([
       {
         ttl: 60,

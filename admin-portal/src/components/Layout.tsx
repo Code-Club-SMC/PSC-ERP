@@ -1,19 +1,25 @@
-import { ReactNode } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
-import { LogOut, Moon, Sun } from "lucide-react";
+import { Bell, LogOut, Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "next-themes";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { logout } from "../../config/apis";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { getActivityNotifications, logout } from "../../config/apis";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate, Outlet } from "react-router-dom";
+import { ActivityNotificationCenter } from "@/components/ActivityNotificationCenter";
 
 export function Layout() {
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
   const queryClient = useQueryClient();
   const navigate = useNavigate()
+  const { data: activityData } = useQuery({
+    queryKey: ["activityNotifications", "headerCount"],
+    queryFn: () => getActivityNotifications({ limit: 1 }),
+    refetchOnWindowFocus: true,
+  });
+  const unreadCount = activityData?.unreadCount || 0;
   const { mutate } = useMutation({
     mutationFn: logout,
     onSuccess: () => {
@@ -47,6 +53,20 @@ export function Layout() {
               <Button
                 variant="ghost"
                 size="icon"
+                className="relative h-[28px] w-[28px]"
+                aria-label="Activity notifications"
+                onClick={() => navigate("/activity-notifications")}
+              >
+                <Bell className="h-3.5 w-3.5" />
+                {unreadCount > 0 && (
+                  <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-red-600 px-1 text-[10px] font-bold leading-4 text-white">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
                 className="h-[28px] w-[28px]"
                 aria-label="Toggle theme"
                 onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
@@ -64,6 +84,7 @@ export function Layout() {
               <Outlet />
             </div>
           </div>
+          <ActivityNotificationCenter />
         </main>
       </div>
     </SidebarProvider>

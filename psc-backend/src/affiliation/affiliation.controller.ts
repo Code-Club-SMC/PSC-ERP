@@ -27,12 +27,14 @@ import {
 import { JwtAccGuard } from 'src/common/guards/jwt-access.guard';
 import { ModuleAccess } from 'src/common/decorators/module-access.decorator';
 import { MODULES } from 'src/common/constants/modules.constants';
+import { ActivityNotificationsService } from 'src/activity-notifications/activity-notifications.service';
 
 @Controller('affiliation')
 export class AffiliationController {
   constructor(
     private affiliationService: AffiliationService,
     private bookingService: BookingService,
+    private activityNotifications: ActivityNotificationsService,
   ) { }
 
   // -------------------- AFFILIATED CLUBS --------------------
@@ -158,7 +160,16 @@ export class AffiliationController {
   @Post('booking')
   async createRoomBooking(@Body() body: AffiliatedRoomBookingDto, @Req() req: any) {
     const adminName = req.user?.name || 'system';
-    return await this.bookingService.cBookingRoomAff(body, adminName);
+    const booking = await this.bookingService.cBookingRoomAff(body, adminName);
+    await this.activityNotifications.notifyBookingEvent({
+      module: MODULES.AFFILIATED_CLUBS,
+      eventType: 'created',
+      bookingId: booking?.id,
+      actorName: adminName,
+      memberLabel: body.affiliatedMembershipNo,
+      deepLink: `/affiliated-clubs?tab=bookings&bookingTab=ACTIVE&id=${booking?.id}`,
+    });
+    return booking;
   }
 
   @ModuleAccess(MODULES.AFFILIATED_CLUBS)

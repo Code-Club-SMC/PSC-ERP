@@ -784,6 +784,12 @@ export default function LawnBookings() {
     isSuperAdmin ||
     hasModuleAction(currentUser?.permissions, "Lawn Bookings", "delete");
   const location = useLocation();
+  useEffect(() => {
+    const tab = new URLSearchParams(location.search).get("tab");
+    if (tab && ["active", "requests", "cancelled", "closed"].includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, [location.search]);
 
   // Handle conversion from Reservation
   useEffect(() => {

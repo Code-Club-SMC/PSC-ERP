@@ -370,6 +370,12 @@ export default function PhotoshootBookings() {
     isSuperAdmin ||
     hasModuleAction(currentUser?.permissions, "Photoshoot Bookings", "delete");
   const location = useLocation();
+  useEffect(() => {
+    const tab = new URLSearchParams(location.search).get("tab");
+    if (tab && ["active", "requests", "cancelled", "closed"].includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, [location.search]);
 
   // Handle conversion from Reservation
   useEffect(() => {

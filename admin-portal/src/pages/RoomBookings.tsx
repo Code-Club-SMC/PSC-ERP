@@ -128,6 +128,12 @@ export default function RoomBookings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const location = useLocation();
+  useEffect(() => {
+    const tab = new URLSearchParams(location.search).get("tab");
+    if (tab && ["active", "requests", "cancelled", "closed"].includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, [location.search]);
   const { data: currentUser } = useQuery({
     queryKey: ["currentUser"],
     queryFn: userWho,

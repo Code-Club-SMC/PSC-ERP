@@ -7,9 +7,10 @@ import { PrismaModule } from 'src/prisma/prisma.module';
 import { ContentModule } from 'src/content/content.module';
 import { NotificationModule } from 'src/notification/notification.module';
 import { MailerModule } from 'src/mailer/mailer.module';
+import { ActivityNotificationsModule } from 'src/activity-notifications/activity-notifications.module';
 
 @Module({
-  imports: [PrismaModule, ContentModule, NotificationModule, MailerModule],
+  imports: [PrismaModule, ContentModule, NotificationModule, MailerModule, ActivityNotificationsModule],
   controllers: [BookingController, SearchController],
   providers: [BookingService, SearchService],
   exports: [BookingService, SearchService],

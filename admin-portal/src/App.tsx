@@ -37,6 +37,7 @@ import Search from "./pages/Search";
 import RoomReports from "./pages/reports/RoomReports";
 import HallReports from "./pages/reports/HallReports";
 import PhotoshootReports from "./pages/reports/PhotoshootReports";
+import ActivityNotifications from "./pages/ActivityNotifications";
 import { canReadModule, ModuleName } from "@/utils/permissions";
 import { GlobalInputValidation } from "@/components/GlobalInputValidation";
 
@@ -224,6 +225,37 @@ export function useCanAccessRoute(routePath: string): boolean {
   return canAccessPermission(permissions, requiredPermission);
 }
 
+function withAuthOnly(Component: React.ComponentType) {
+  return function AuthOnlyWrapper() {
+    const location = useLocation();
+    const { data: currentUser, isLoading } = useQuery({
+      queryKey: ["currentUser"],
+      queryFn: async () => {
+        try {
+          return await userWho();
+        } catch {
+          return null;
+        }
+      },
+      retry: 1,
+    });
+
+    if (isLoading) {
+      return (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      );
+    }
+
+    if (!currentUser) {
+      return <Navigate to="/auth" replace state={{ from: location.pathname }} />;
+    }
+
+    return <Component />;
+  };
+}
+
 // Hook to get user's role info
 export function useUserRole() {
   const { data: currentUser } = useQuery({
@@ -302,6 +334,7 @@ const ProtectedSearch = withPermissions(Search);
 const ProtectedRoomReports = withPermissions(RoomReports);
 const ProtectedHallReports = withPermissions(HallReports);
 const ProtectedPhotoshootReports = withPermissions(PhotoshootReports);
+const ProtectedActivityNotifications = withAuthOnly(ActivityNotifications);
 
 
 // Permission Denied page doesn't need permissions check
@@ -359,6 +392,7 @@ function App() {
               <Route path="/reports/rooms" element={<ProtectedRoomReports />} />
               <Route path="/reports/halls" element={<ProtectedHallReports />} />
               <Route path="/reports/photoshoot" element={<ProtectedPhotoshootReports />} />
+              <Route path="/activity-notifications" element={<ProtectedActivityNotifications />} />
 
             </Route>
 

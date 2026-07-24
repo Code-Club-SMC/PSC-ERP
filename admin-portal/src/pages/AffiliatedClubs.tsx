@@ -25,6 +25,7 @@ import { format, startOfMonth, endOfMonth } from "date-fns";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "react-router-dom";
 import {
   getAffiliatedClubs,
   getAffiliatedClubRequests,
@@ -114,6 +115,18 @@ export default function AffiliatedClubs() {
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const location = useLocation();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get("tab");
+    const bookingTabParam = params.get("bookingTab");
+    if (tab === "bookings") setActiveTab("bookings");
+    if (bookingTabParam && ["ACTIVE", "REQUESTS", "CANCELLED", "CLOSED"].includes(bookingTabParam)) {
+      setBookingTab(bookingTabParam);
+      setBookingPage(1);
+    }
+  }, [location.search]);
 
   // ─── Queries ──────────────────────────────────────────────
 
@@ -1591,3 +1604,5 @@ export default function AffiliatedClubs() {
     </div >
   );
 }
+
+

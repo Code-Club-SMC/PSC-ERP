@@ -3,12 +3,14 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { FeedbackStatus } from '@prisma/client';
 import { AddFeedbackRemarkDto, CreateFeedbackCategoryDto, CreateFeedbackDto, CreateFeedbackSubCategoryDto } from './dtos/feedback.dto';
 import { NotificationService } from 'src/notification/notification.service';
+import { ActivityNotificationsService } from 'src/activity-notifications/activity-notifications.service';
 
 @Injectable()
 export class FeedbackService {
     constructor(
         private prisma: PrismaService,
-        private notificationService: NotificationService
+        private notificationService: NotificationService,
+        private activityNotifications: ActivityNotificationsService,
     ) { }
 
     async findAll() {
@@ -32,7 +34,7 @@ export class FeedbackService {
         });
     }
 
-    async updateStatus(id: number, status: FeedbackStatus) {
+    async updateStatus(id: number, status: FeedbackStatus, adminName = 'system') {
         const feedback = await this.prisma.feedback.findUnique({ where: { id } });
         if (!feedback) throw new NotFoundException('Feedback not found');
 
@@ -47,11 +49,19 @@ export class FeedbackService {
             'Feedback Status Updated',
             `Your feedback "${feedback.subject}" status has been updated to ${status.replace(/_/g, ' ')}.`
         );
+        await this.activityNotifications.notifyFeedbackEvent({
+            eventType: 'updated',
+            feedbackId: id,
+            actorName: adminName,
+            memberLabel: feedback.memberNo,
+            deepLink: `/feedback?id=${id}`,
+            metadata: { status },
+        });
 
         return updatedFeedback;
     }
 
-    async addRemark(id: number, dto: AddFeedbackRemarkDto) {
+    async addRemark(id: number, dto: AddFeedbackRemarkDto, adminName = dto.adminName || 'system') {
         const feedback = await this.prisma.feedback.findUnique({ where: { id } });
         if (!feedback) throw new NotFoundException('Feedback not found');
 
@@ -69,6 +79,14 @@ export class FeedbackService {
             'New Remark on Feedback',
             `A new remark has been added to your feedback "${feedback.subject}" by ${dto.adminName}: ${dto.remark}`
         );
+        await this.activityNotifications.notifyFeedbackEvent({
+            eventType: 'updated',
+            feedbackId: id,
+            actorName: adminName,
+            memberLabel: feedback.memberNo,
+            deepLink: `/feedback?id=${id}`,
+            metadata: { action: 'remark_added' },
+        });
 
         return remark;
     }
@@ -129,7 +147,7 @@ export class FeedbackService {
     }
 
     async createFeedback(dto: CreateFeedbackDto, Membership_No: string) {
-        return this.prisma.feedback.create({
+        const feedback = await this.prisma.feedback.create({
             data: {
                 memberNo: Membership_No,
                 subject: dto.subject,
@@ -138,5 +156,14 @@ export class FeedbackService {
                 message: dto.message,
             },
         });
+        await this.activityNotifications.notifyFeedbackEvent({
+            eventType: 'created',
+            feedbackId: feedback.id,
+            actorName: Membership_No,
+            memberLabel: Membership_No,
+            deepLink: `/feedback?id=${feedback.id}`,
+            metadata: { subject: dto.subject },
+        });
+        return feedback;
     }
 }

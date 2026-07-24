@@ -26,6 +26,7 @@ model Admin {
   hallReservations HallReservation[]
   lawnReservations LawnReservation[]
   photoshootReservations PhotoshootReservation[]
+  activityNotificationRecipients ActivityNotificationRecipient[]
 
   createdBy String @default("")
   updatedBy String @default("")
@@ -34,6 +35,48 @@ model Admin {
   updatedAt        DateTime          @updatedAt
 
   @@map("admin")
+}
+
+model ActivityNotification {
+  id         Int      @id @default(autoincrement())
+  module     String   @db.VarChar(120)
+  eventType  String   @db.VarChar(80)
+  title      String   @db.VarChar(255)
+  message    String   @db.Text
+  deepLink   String?  @db.VarChar(500)
+  entityType String?  @db.VarChar(80)
+  entityId   String?  @db.VarChar(80)
+  actorName  String?  @db.VarChar(120)
+  metadata   Json?
+
+  recipients ActivityNotificationRecipient[]
+
+  createdAt DateTime @default(now())
+
+  @@index([module])
+  @@index([eventType])
+  @@index([createdAt])
+  @@map("activitynotification")
+}
+
+model ActivityNotificationRecipient {
+  id             Int      @id @default(autoincrement())
+  notificationId Int
+  adminId        Int
+  isRead         Boolean  @default(false)
+  readAt         DateTime?
+  deletedAt      DateTime?
+
+  notification ActivityNotification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  admin        Admin                @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([notificationId, adminId])
+  @@index([adminId, deletedAt, createdAt])
+  @@index([adminId, isRead, deletedAt])
+  @@map("activitynotificationrecipient")
 }
 
 enum MemberStatus {

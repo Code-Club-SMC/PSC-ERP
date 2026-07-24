@@ -1,6 +1,7 @@
 import axios from "axios";
 // const base_url = "http://localhost:3000/api";
 const base_url = "https://admin.peshawarservicesclub.com/api";
+export const socket_base_url = base_url.replace(/\/api$/, "");
 
 export const authAdmin = async (data: any): Promise<any> => {
   try {
@@ -2783,4 +2784,52 @@ export const getPhotoshootBookingsReport = async (params: Record<string, string 
       "Something went wrong";
     throw { message, status: error.response?.status || 500 };
   }
+};
+
+export type ActivityNotificationItem = {
+  id: number;
+  notificationId: number;
+  module: string;
+  eventType: string;
+  title: string;
+  message: string;
+  deepLink?: string;
+  entityType?: string;
+  entityId?: string;
+  actorName?: string;
+  metadata?: Record<string, any>;
+  isRead: boolean;
+  readAt?: string;
+  createdAt: string;
+};
+
+export const getActivityNotifications = async (params: { from?: string; to?: string; limit?: number } = {}) => {
+  const response = await axios.get(`${base_url}/activity-notifications`, {
+    params,
+    withCredentials: true,
+  });
+  return response.data as { data: ActivityNotificationItem[]; unreadCount: number };
+};
+
+export const markActivityNotificationRead = async (id: number) => {
+  const response = await axios.patch(`${base_url}/activity-notifications/${id}/read`, {}, { withCredentials: true });
+  return response.data;
+};
+
+export const markAllActivityNotificationsRead = async () => {
+  const response = await axios.patch(`${base_url}/activity-notifications/read-all`, {}, { withCredentials: true });
+  return response.data;
+};
+
+export const deleteActivityNotification = async (id: number) => {
+  const response = await axios.delete(`${base_url}/activity-notifications/${id}`, { withCredentials: true });
+  return response.data;
+};
+
+export const deleteActivityNotifications = async (ids: number[]) => {
+  const response = await axios.delete(`${base_url}/activity-notifications`, {
+    data: { ids },
+    withCredentials: true,
+  });
+  return response.data;
 };

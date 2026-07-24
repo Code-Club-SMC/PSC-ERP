@@ -30,6 +30,7 @@ import {
 } from 'src/common/utils/permissions';
 import { RolesEnum } from 'src/common/constants/roles.enum';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { ActivityNotificationsService } from 'src/activity-notifications/activity-notifications.service';
 
 @Controller('booking')
 export class BookingController {
@@ -37,6 +38,7 @@ export class BookingController {
     private readonly bookingService: BookingService,
     private readonly contentService: ContentService,
     private readonly prisma: PrismaService,
+    private readonly activityNotifications: ActivityNotificationsService,
   ) { }
 
   private bookingModuleFromCategory(category?: string) {
@@ -57,8 +59,9 @@ export class BookingController {
   private bookingModuleFromBookingFor(bookingFor?: string) {
     switch (bookingFor) {
       case 'rooms':
-      case 'room_aff':
         return MODULES.ROOM_BOOKINGS;
+      case 'room_aff':
+        return MODULES.AFFILIATED_CLUBS;
       case 'halls':
         return MODULES.HALL_BOOKINGS;
       case 'lawns':
@@ -68,6 +71,37 @@ export class BookingController {
       default:
         throw new BadRequestException('Invalid booking type');
     }
+  }
+
+  private notificationModuleFromBookingFor(bookingFor?: string) {
+    return this.bookingModuleFromBookingFor(bookingFor);
+  }
+
+  private bookingDeepLink(moduleName: string, bookingId: number | string, tab: string) {
+    if (moduleName === MODULES.ROOM_BOOKINGS) return `/bookings/rooms?tab=${tab}&id=${bookingId}`;
+    if (moduleName === MODULES.HALL_BOOKINGS) return `/bookings/halls?tab=${tab}&id=${bookingId}`;
+    if (moduleName === MODULES.LAWN_BOOKINGS) return `/bookings/lawns?tab=${tab}&id=${bookingId}`;
+    if (moduleName === MODULES.PHOTOSHOOT_BOOKINGS) return `/bookings/photoshoot?tab=${tab}&id=${bookingId}`;
+    if (moduleName === MODULES.AFFILIATED_CLUBS) return `/affiliated-clubs?tab=bookings&bookingTab=${tab.toUpperCase()}&id=${bookingId}`;
+    return '/';
+  }
+
+  private async notifyBookingActivity(input: {
+    moduleName: string;
+    eventType: 'created' | 'cancellation_requested' | 'cancelled' | 'closed';
+    bookingId: number | string;
+    actorName?: string;
+    memberLabel?: string;
+    tab: string;
+  }) {
+    await this.activityNotifications.notifyBookingEvent({
+      module: input.moduleName,
+      eventType: input.eventType,
+      bookingId: input.bookingId,
+      actorName: input.actorName,
+      memberLabel: input.memberLabel,
+      deepLink: this.bookingDeepLink(input.moduleName, input.bookingId, input.tab),
+    });
   }
 
   private async assertBookingModuleAccess(
@@ -146,38 +180,50 @@ export class BookingController {
     );
     const adminName = req.user?.name || 'system';
     // console.log(payload)
-    if (payload.category === 'Room')
-      return await this.bookingService.cBookingRoom(
+    if (payload.category === 'Room') {
+      const booking = await this.bookingService.cBookingRoom(
         {
           ...payload,
           paymentMode: payload.paymentMode || PaymentMode.CASH,
         },
         adminName,
       );
-    else if (payload.category === 'Hall')
-      return await this.bookingService.cBookingHall(
+      await this.notifyBookingActivity({ moduleName: MODULES.ROOM_BOOKINGS, eventType: 'created', bookingId: booking?.id, actorName: adminName, memberLabel: payload.membershipNo, tab: 'active' });
+      return booking;
+    }
+    else if (payload.category === 'Hall') {
+      const booking = await this.bookingService.cBookingHall(
         {
           ...payload,
           paymentMode: payload.paymentMode || PaymentMode.CASH,
         },
         adminName,
       );
-    else if (payload.category === 'Lawn')
-      return await this.bookingService.cBookingLawn(
+      await this.notifyBookingActivity({ moduleName: MODULES.HALL_BOOKINGS, eventType: 'created', bookingId: booking?.id, actorName: adminName, memberLabel: payload.membershipNo, tab: 'active' });
+      return booking;
+    }
+    else if (payload.category === 'Lawn') {
+      const booking = await this.bookingService.cBookingLawn(
         {
           ...payload,
           paymentMode: payload.paymentMode || PaymentMode.CASH,
         },
         adminName,
       );
-    else if (payload.category === 'Photoshoot')
-      return await this.bookingService.cBookingPhotoshoot(
+      await this.notifyBookingActivity({ moduleName: MODULES.LAWN_BOOKINGS, eventType: 'created', bookingId: booking?.id, actorName: adminName, memberLabel: payload.membershipNo, tab: 'active' });
+      return booking;
+    }
+    else if (payload.category === 'Photoshoot') {
+      const booking = await this.bookingService.cBookingPhotoshoot(
         {
           ...payload,
           paymentMode: payload.paymentMode || PaymentMode.CASH,
         },
         adminName,
       );
+      await this.notifyBookingActivity({ moduleName: MODULES.PHOTOSHOOT_BOOKINGS, eventType: 'created', bookingId: booking?.id, actorName: adminName, memberLabel: payload.membershipNo, tab: 'active' });
+      return booking;
+    }
   }
 
   @UseGuards(JwtAccGuard)
@@ -364,14 +410,24 @@ export class BookingController {
       paid_at: body.paid_at,
     } : undefined;
 
+    let result: any;
     if (bookingFor === 'rooms')
-      return this.bookingService.closeBookingRoom(Number(bookID), refundPayload, adminName);
+      result = await this.bookingService.closeBookingRoom(Number(bookID), refundPayload, adminName);
     if (bookingFor === 'room_aff')
-      return this.bookingService.closeBookingRoomAff(Number(bookID), refundPayload, adminName);
+      result = await this.bookingService.closeBookingRoomAff(Number(bookID), refundPayload, adminName);
     if (bookingFor === 'halls')
-      return this.bookingService.closeBookingHall(Number(bookID), refundPayload, adminName);
+      result = await this.bookingService.closeBookingHall(Number(bookID), refundPayload, adminName);
     if (bookingFor === 'lawns')
-      return this.bookingService.closeBookingLawn(Number(bookID), refundPayload, adminName);
+      result = await this.bookingService.closeBookingLawn(Number(bookID), refundPayload, adminName);
+
+    await this.notifyBookingActivity({
+      moduleName: this.notificationModuleFromBookingFor(bookingFor),
+      eventType: 'closed',
+      bookingId: bookID,
+      actorName: adminName,
+      tab: 'closed',
+    });
+    return result;
   }
 
   @UseGuards(JwtAccGuard)
@@ -401,16 +457,26 @@ export class BookingController {
       );
     }
 
+    let result: any;
     if (bookingFor === 'rooms')
-      return this.bookingService.cCancellationRequestRoom(Number(bookID), reason, requestedBy);
+      result = await this.bookingService.cCancellationRequestRoom(Number(bookID), reason, requestedBy);
     if (bookingFor === 'room_aff')
-      return this.bookingService.cCancellationRequestRoomAff(Number(bookID), reason, requestedBy);
+      result = await this.bookingService.cCancellationRequestRoomAff(Number(bookID), reason, requestedBy);
     if (bookingFor === 'halls')
-      return this.bookingService.cCancellationRequestHall(Number(bookID), reason, requestedBy);
+      result = await this.bookingService.cCancellationRequestHall(Number(bookID), reason, requestedBy);
     if (bookingFor === 'lawns')
-      return this.bookingService.cCancellationRequestLawn(Number(bookID), reason, requestedBy);
+      result = await this.bookingService.cCancellationRequestLawn(Number(bookID), reason, requestedBy);
     if (bookingFor === 'photoshoots')
-      return this.bookingService.cCancellationRequestPhotoshoot(Number(bookID), reason, requestedBy);
+      result = await this.bookingService.cCancellationRequestPhotoshoot(Number(bookID), reason, requestedBy);
+
+    await this.notifyBookingActivity({
+      moduleName: this.notificationModuleFromBookingFor(bookingFor),
+      eventType: 'cancellation_requested',
+      bookingId: bookID,
+      actorName: requestedBy,
+      tab: 'requests',
+    });
+    return result;
   }
 
   @UseGuards(JwtAccGuard)
@@ -427,12 +493,22 @@ export class BookingController {
       this.bookingModuleFromBookingFor(bookingFor),
       'update',
     );
-    return this.bookingService.updateCancellationReq(
+    const result = await this.bookingService.updateCancellationReq(
       bookingFor,
       Number(bookID),
       status,
       remarks,
     );
+    if (status === 'APPROVED') {
+      await this.notifyBookingActivity({
+        moduleName: this.notificationModuleFromBookingFor(bookingFor),
+        eventType: 'cancelled',
+        bookingId: bookID,
+        actorName: req?.user?.name || 'system',
+        tab: 'cancelled',
+      });
+    }
+    return result;
   }
 
   @UseGuards(JwtAccGuard)
