@@ -43,7 +43,7 @@ export class AccountsService {
                 message: `Bills for ${month}/${year} uploaded and extracted successfully`,
                 count: zip.getEntries().length,
             };
-        } catch (error) {
+        } catch (error: any) {
             throw new BadRequestException('Failed to extract ZIP file: ' + error.message);
         }
     }
@@ -63,6 +63,7 @@ export class AccountsService {
 
         return this.getLatestBill(membershipNo);
     }
+
 
     async getLatestBill(membershipNo: string) {
         // Scan years descending

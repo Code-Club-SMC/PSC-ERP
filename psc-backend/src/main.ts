@@ -31,7 +31,7 @@ async function bootstrap() {
     credentials: true,
   });
   app.use(cookieParser());
-  app.useStaticAssets(join(__dirname, '..', 'data', 'bills'), {
+  app.useStaticAssets(join(process.cwd(), 'data', 'bills'), {
     prefix: '/bills/',
   });
   app.setGlobalPrefix('api');

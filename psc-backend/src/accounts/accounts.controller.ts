@@ -6,10 +6,14 @@ import {
     UploadedFile,
     Body,
     Query,
+    Param,
+    Res,
     UseGuards,
     Req,
+    NotFoundException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Response } from 'express';
 import { AccountsService } from './accounts.service';
 import { JwtAccGuard } from 'src/common/guards/jwt-access.guard';
 import { ModuleAccess } from 'src/common/decorators/module-access.decorator';

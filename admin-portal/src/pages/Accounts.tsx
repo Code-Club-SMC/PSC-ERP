@@ -686,6 +686,7 @@ function MonthlyBillsTab() {
     try {
       setFetching(true);
       const data = await listMonthlyBills(month, year);
+      console.log(data)
       setBills(data);
       setFetchedMonth(month);
       setFetchedYear(year);
@@ -819,12 +820,12 @@ function MonthlyBillsTab() {
                       {/* <a href={`https://admin.peshawarservicesclub.com${bill.url}`} target="_blank" rel="noreferrer">
                         View Bill
                       </a> */}
-                      <a href={bill.url} target="_blank" rel="noreferrer">
-                        View Bill
-                      </a>
-                      {/* <a href={`http://localhost:3000${bill.url}`} target="_blank" rel="noreferrer">
+                      {/* <a href={bill.url} target="_blank" rel="noreferrer">
                         View Bill
                       </a> */}
+                       <a href={`http://localhost:3000${bill.url}`} target="_blank" rel="noreferrer">
+                        View Bill
+                      </a> 
                     </Button>
                   </TableCell>
                 </TableRow>

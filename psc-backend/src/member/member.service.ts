@@ -151,7 +151,7 @@ export class MemberService {
       return await this.prismaService.member.delete({
         where: { Membership_No: memberID },
       });
-    } catch (error) {
+    } catch (error: {code: string} | any) {
       // If there are foreign key constraints, provide a helpful error
       if (error.code === 'P2003') {
         throw new HttpException(
@@ -208,9 +208,12 @@ export class MemberService {
   }
 
   async getMember(memberID: string) {
+    if(!memberID) return new HttpException('Member ID is required', HttpStatus.BAD_REQUEST);
     return await this.prismaService.member.findUnique({
       where: { Membership_No: memberID },
       select: {
+        Membership_No: true,
+        Name: true,
         Status: true,
         Actual_Status: true,
         Balance: true,
