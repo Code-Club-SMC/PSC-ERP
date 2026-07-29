@@ -8,8 +8,7 @@ services:
       - "3000:3000"
     volumes:
       - notification_data:/app/data
-      - bills_data:/app/data/bills
-      - ./psc-backend/data/bills:/app/data/bills
+      - /psc/portal/data/bills:/psc/portal/data/bills
     env_file:
       - .env
 
@@ -25,4 +24,3 @@ services:
 
 volumes:
   notification_data:
-  bills_data:

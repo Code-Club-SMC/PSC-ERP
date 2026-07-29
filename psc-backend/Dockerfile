@@ -29,8 +29,8 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/package.json ./package.json
 
-# Ensure data directory exists for persistence
-RUN mkdir -p data/bills
+# Ensure data directories exist for persistence
+RUN mkdir -p data/bills /psc/portal/data/bills
 
 EXPOSE 3000
 

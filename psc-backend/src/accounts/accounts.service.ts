@@ -2,10 +2,11 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import * as fs from 'fs';
 import * as path from 'path';
 import AdmZip from 'adm-zip';
+import { getBillsRoot } from './bills-path';
 
 @Injectable()
 export class AccountsService {
-    private readonly BILLS_ROOT = path.join(process.cwd(), 'data', 'bills');
+    private readonly BILLS_ROOT = getBillsRoot();
 
     constructor() {
         this.ensureDirectory(this.BILLS_ROOT);
