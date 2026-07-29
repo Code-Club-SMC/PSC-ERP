@@ -10,7 +10,7 @@ services:
       - notification_data:/app/data
       - /psc/portal/data/bills:/psc/portal/data/bills
     env_file:
-      - /psc-backend/.env
+      - ./psc-backend/.env
 
   admin-portal:
     build:
