@@ -28,6 +28,10 @@ import { ThrottleEmail } from 'src/common/decorators/throttle-email.decorator';
 import { ModuleAccess } from 'src/common/decorators/module-access.decorator';
 import { MODULES } from 'src/common/constants/modules.constants';
 import { normalizePermissionMatrix } from 'src/common/utils/permissions';
+import {
+  ACCESS_TOKEN_COOKIE_MAX_AGE,
+  REFRESH_TOKEN_COOKIE_MAX_AGE,
+} from './auth-token.constants';
 
 @Controller('auth')
 export class AuthController {
@@ -91,13 +95,13 @@ export class AuthController {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        maxAge: ACCESS_TOKEN_COOKIE_MAX_AGE,
       });
       res.cookie('refresh_token', refresh_token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        maxAge: REFRESH_TOKEN_COOKIE_MAX_AGE,
       });
       return res.status(200).json({ message: 'Login successful' });
     }
@@ -128,12 +132,15 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const clientType = req.headers['client-type'] || 'web';
-    const { id, name, email, role, permissions } = req.user as {
+    const { id, name, email, role, permissions, FCMToken, sessionToken, status } = req.user as {
       id: string | number;
       name: string;
       email: string;
       role: string;
+      status?: string;
       permissions?: any;
+      FCMToken?: string;
+      sessionToken?: string;
     };
     const { access_token, refresh_token } =
       await this.authService.refreshTokens({
@@ -141,7 +148,10 @@ export class AuthController {
         name,
         email,
         role,
+        status,
         permissions: permissions ?? [],
+        FCMToken,
+        sessionToken,
       });
     // for web
     if (clientType === 'web') {
@@ -149,13 +159,13 @@ export class AuthController {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
-        maxAge: 7 * 24 * 60 * 60 * 1000,
+        maxAge: ACCESS_TOKEN_COOKIE_MAX_AGE,
       });
       res.cookie('refresh_token', refresh_token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
-        maxAge: 7 * 24 * 60 * 60 * 1000,
+        maxAge: REFRESH_TOKEN_COOKIE_MAX_AGE,
       });
       return { message: 'Login successful' };
     }
@@ -315,13 +325,13 @@ export class AuthController {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: true,
-        maxAge: 7 * 24 * 60 * 60 * 1000,
+        maxAge: ACCESS_TOKEN_COOKIE_MAX_AGE,
       });
       res.cookie('refresh_token', refresh_token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: true,
-        maxAge: 7 * 24 * 60 * 60 * 1000,
+        maxAge: REFRESH_TOKEN_COOKIE_MAX_AGE,
       });
       return res.status(200).json({ message: 'Login successful' });
     }

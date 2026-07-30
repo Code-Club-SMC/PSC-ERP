@@ -26,8 +26,8 @@ import { FeedbackModule } from './feedback/feedback.module';
 import { AccountsModule } from './accounts/accounts.module';
 import { ReportsModule } from './reports/reports.module';
 import { ActivityNotificationsModule } from './activity-notifications/activity-notifications.module';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { UserRateLimitInterceptor } from './common/interceptors/user-rate-limit.interceptor';
 
 @Module({
   imports: [
@@ -59,18 +59,15 @@ import { APP_GUARD } from '@nestjs/core';
     AccountsModule,
     ReportsModule,
     ActivityNotificationsModule,
-    ThrottlerModule.forRoot([
-      {
-        ttl: 60,
-        limit: 1000,
-      }
-    ])
   ],
   
   controllers: [],
-  providers: [MailerService, {
-    provide: APP_GUARD,
-    useClass: ThrottlerGuard,
-  }],
+  providers: [
+    MailerService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: UserRateLimitInterceptor,
+    },
+  ],
 })
 export class AppModule { }

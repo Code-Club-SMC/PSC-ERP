@@ -9,6 +9,8 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "test:permissions": "node scripts/test-permissions.mjs",
+    "test:auth-rate-limit": "node scripts/auth-rate-limit-test.mjs",
+    "test:rate-limit": "node scripts/rate-limit-attack.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

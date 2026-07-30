@@ -27,6 +27,7 @@ model Admin {
   lawnReservations LawnReservation[]
   photoshootReservations PhotoshootReservation[]
   activityNotificationRecipients ActivityNotificationRecipient[]
+  requestLogs      AdminRequestLog[]
 
   createdBy String @default("")
   updatedBy String @default("")
@@ -133,6 +134,7 @@ model Member {
   // vouchers PaymentVoucher[]
   feedbacks Feedback[]
   billPayments BillPaymentHistory[]
+  requestLogs MemberRequestLog[]
 
   otp       Int? //temp otp
   otpExpiry DateTime? //otp expiry time
@@ -1383,6 +1385,39 @@ model BillPaymentHistory {
 enum attemptStatus {
   SUCCESS
   FAILURE
+}
+
+enum RequestLogStatus {
+  SUCCEED
+  FAILED
+}
+
+model AdminRequestLog {
+  reqid          Int              @id @default(autoincrement())
+  madeBy         Int
+  admin          Admin            @relation(fields: [madeBy], references: [id])
+  requestTo      String           @db.VarChar(120)
+  madeAt         DateTime         @default(now())
+  responseStatus RequestLogStatus
+
+  @@index([madeAt])
+  @@index([madeBy])
+  @@index([madeBy, requestTo, madeAt])
+  @@map("admin_request_log")
+}
+
+model MemberRequestLog {
+  reqid          Int              @id @default(autoincrement())
+  madeBy         String
+  member         Member           @relation(fields: [madeBy], references: [Membership_No])
+  requestTo      String           @db.VarChar(120)
+  madeAt         DateTime         @default(now())
+  responseStatus RequestLogStatus
+
+  @@index([madeAt])
+  @@index([madeBy])
+  @@index([madeBy, requestTo, madeAt])
+  @@map("member_request_log")
 }
 
 

@@ -11,6 +11,10 @@ import {
   isValidPermissionPayload,
   normalizePermissionMatrix,
 } from 'src/common/utils/permissions';
+import {
+  ACCESS_TOKEN_EXPIRES_IN,
+  REFRESH_TOKEN_EXPIRES_IN,
+} from './auth-token.constants';
 
 @Injectable()
 export class AuthService {
@@ -39,11 +43,11 @@ export class AuthService {
           };
     const accessToken = await this.jwtService.signAsync(tokenPayload, {
       secret: process.env.JWT_ACCESS_SECRET!,
-      expiresIn: '1d',
+      expiresIn: ACCESS_TOKEN_EXPIRES_IN,
     });
     const refresh_token = await this.jwtService.signAsync(tokenPayload, {
       secret: process.env.JWT_REFRESH_SECRET!,
-      expiresIn: '7d',
+      expiresIn: REFRESH_TOKEN_EXPIRES_IN,
     });
     return { access_token: accessToken, refresh_token: refresh_token };
   }
