@@ -474,7 +474,7 @@ export class BookingController {
       eventType: 'cancellation_requested',
       bookingId: bookID,
       actorName: requestedBy,
-      tab: 'requests',
+      tab: bookingFor === 'photoshoots' ? 'active' : 'requests',
     });
     return result;
   }

@@ -88,6 +88,13 @@ import { PaymentMode } from "@/types/hall-booking.type";
 import { BookingPaymentSummaryCard } from "@/components/BookingPaymentSummaryCard";
 import { BookingPaymentDialog } from "@/components/BookingPaymentDialog";
 import { hasModuleAction } from "@/utils/permissions";
+import {
+  ACTIVITY_HIGHLIGHT_CLASS,
+  getActivityBookingFilters,
+  getActivityTargetId,
+  isActivityTarget,
+  activityScrollRef,
+} from "@/utils/activityDeepLink";
 import paymentRules from "../config/paymentRules.json";
 
 
@@ -605,10 +612,16 @@ export default function HallBookings() {
     isSuperAdmin ||
     hasModuleAction(currentUser?.permissions, "Hall Bookings", "delete");
   const location = useLocation();
+  const activityTargetId = useMemo(() => getActivityTargetId(location.search), [location.search]);
   useEffect(() => {
     const tab = new URLSearchParams(location.search).get("tab");
     if (tab && ["active", "requests", "cancelled", "closed"].includes(tab)) {
       setActiveTab(tab);
+    }
+    const nextFilters = getActivityBookingFilters(location.search, searchFilters);
+    if (nextFilters !== searchFilters) {
+      setSearchFilters(nextFilters);
+      setPaymentFilter("ALL");
     }
   }, [location.search]);
 
@@ -2207,7 +2220,11 @@ export default function HallBookings() {
                   </TableHeader>
                   <TableBody>
                     {filteredBookings.map((booking: HallBooking) => (
-                      <TableRow key={booking.id}>
+                      <TableRow
+                        key={booking.id}
+                        ref={activityScrollRef(booking.id, activityTargetId)}
+                        className={cn(isActivityTarget(booking.id, activityTargetId) && ACTIVITY_HIGHLIGHT_CLASS)}
+                      >
                         <TableCell className="font-medium">
                           {booking.member?.Name || booking.member?.Membership_No}
                         </TableCell>

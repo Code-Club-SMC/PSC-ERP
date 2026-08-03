@@ -88,6 +88,11 @@ import { parseLocalDate } from "@/utils/hallBookingUtils";
 import { format, startOfDay, addYears, subYears } from "date-fns";
 import { BookingDetailsCard } from "@/components/details/RoomBookingDets";
 import { hasModuleAction } from "@/utils/permissions";
+import {
+  ACTIVITY_HIGHLIGHT_CLASS,
+  getActivityBookingFilters,
+  getActivityTargetId,
+} from "@/utils/activityDeepLink";
 
 // ShadCN components for inlined form
 import { Checkbox } from "@/components/ui/checkbox";
@@ -128,10 +133,16 @@ export default function RoomBookings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const location = useLocation();
+  const activityTargetId = useMemo(() => getActivityTargetId(location.search), [location.search]);
   useEffect(() => {
     const tab = new URLSearchParams(location.search).get("tab");
     if (tab && ["active", "requests", "cancelled", "closed"].includes(tab)) {
       setActiveTab(tab);
+    }
+    const nextFilters = getActivityBookingFilters(location.search, searchFilters);
+    if (nextFilters !== searchFilters) {
+      setSearchFilters(nextFilters);
+      setPaymentFilter("ALL");
     }
   }, [location.search]);
   const { data: currentUser } = useQuery({
@@ -1044,10 +1055,7 @@ export default function RoomBookings() {
     today.setHours(0, 0, 0, 0);
     const normalizedCheckIn = new Date(checkInDate);
     normalizedCheckIn.setHours(0, 0, 0, 0);
-    if (normalizedCheckIn < today) {
-      toast({ title: "Invalid check-in date", description: "Cannot book in the past", variant: "destructive" });
-      return;
-    }
+
 
     const conflict = checkConflicts(selectedRoomIds, form.checkIn, form.checkOut);
     if (conflict) {
@@ -1355,8 +1363,8 @@ export default function RoomBookings() {
           checkOutLabel="Check-Out Date"
         />
 
-          <TabsContent value="active" className="m-0">
-            <BookingsTable
+        <TabsContent value="active" className="m-0">
+          <BookingsTable
             bookings={filteredBookings}
             isLoading={isLoading}
             onEdit={canUpdateRoomBookings ? openEditDialog : undefined}
@@ -1369,8 +1377,10 @@ export default function RoomBookings() {
             onCancel={canDeleteRoomBookings ? setCancelBooking : undefined}
             onClose={canUpdateRoomBookings ? setCloseBookingTarget : undefined}
             getPaymentBadge={getPaymentBadge}
+            highlightedBookingId={activityTargetId}
+            highlightClassName={ACTIVITY_HIGHLIGHT_CLASS}
           />
-          </TabsContent>
+        </TabsContent>
 
         <TabsContent value="cancelled" className="m-0">
           <BookingsTable
@@ -1383,6 +1393,8 @@ export default function RoomBookings() {
             }}
             onViewVouchers={handleViewVouchers}
             getPaymentBadge={getPaymentBadge}
+            highlightedBookingId={activityTargetId}
+            highlightClassName={ACTIVITY_HIGHLIGHT_CLASS}
           />
         </TabsContent>
 
@@ -1400,6 +1412,8 @@ export default function RoomBookings() {
             onApprove={canUpdateRoomBookings ? handleApproveReq : undefined}
             onReject={canUpdateRoomBookings ? handleRejectReq : undefined}
             onViewReason={handleViewReason}
+            highlightedBookingId={activityTargetId}
+            highlightClassName={ACTIVITY_HIGHLIGHT_CLASS}
           />
         </TabsContent>
 
@@ -1413,6 +1427,8 @@ export default function RoomBookings() {
             }}
             onViewVouchers={handleViewVouchers}
             getPaymentBadge={getPaymentBadge}
+            highlightedBookingId={activityTargetId}
+            highlightClassName={ACTIVITY_HIGHLIGHT_CLASS}
           />
         </TabsContent>
       </Tabs>

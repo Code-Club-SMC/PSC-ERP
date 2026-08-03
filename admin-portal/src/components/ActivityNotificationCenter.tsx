@@ -114,7 +114,9 @@ export function ActivityNotificationCenter() {
       window.setTimeout(() => setShake(false), 1400);
     });
 
-    return () => socket.disconnect();
+    return () => {
+      socket.disconnect();
+    };
   }, [currentUser, queryClient]);
 
   const unreadCount = useMemo(() => items.filter((item) => !item.isRead).length, [items]);

@@ -30,6 +30,13 @@ import { VouchersDialog } from "@/components/VouchersDialog";
 import { BookingPaymentSummaryCard } from "@/components/BookingPaymentSummaryCard";
 import { BookingPaymentDialog } from "@/components/BookingPaymentDialog";
 import { hasModuleAction } from "@/utils/permissions";
+import {
+  ACTIVITY_HIGHLIGHT_CLASS,
+  getActivityBookingFilters,
+  getActivityTargetId,
+  isActivityTarget,
+  activityScrollRef,
+} from "@/utils/activityDeepLink";
 
 export interface PhotoshootBooking {
   id: number;
@@ -370,10 +377,16 @@ export default function PhotoshootBookings() {
     isSuperAdmin ||
     hasModuleAction(currentUser?.permissions, "Photoshoot Bookings", "delete");
   const location = useLocation();
+  const activityTargetId = useMemo(() => getActivityTargetId(location.search), [location.search]);
   useEffect(() => {
     const tab = new URLSearchParams(location.search).get("tab");
-    if (tab && ["active", "requests", "cancelled", "closed"].includes(tab)) {
+    if (tab && ["active", "cancelled"].includes(tab)) {
       setActiveTab(tab);
+    }
+    const nextFilters = getActivityBookingFilters(location.search, searchFilters);
+    if (nextFilters !== searchFilters) {
+      setSearchFilters(nextFilters);
+      setStatusFilter("ALL");
     }
   }, [location.search]);
 
@@ -1150,7 +1163,14 @@ export default function PhotoshootBookings() {
                       </TableRow>
                     ) : (
                       filteredBookings.map((booking, idx) => (
-                        <TableRow key={booking.id} ref={idx === filteredBookings.length - 1 ? lastElementRef : null}>
+                        <TableRow
+                          key={booking.id}
+                          ref={(node: HTMLTableRowElement | null) => {
+                            if (idx === filteredBookings.length - 1) lastElementRef(node as unknown as HTMLDivElement);
+                            activityScrollRef(booking.id, activityTargetId)(node);
+                          }}
+                          className={cn(isActivityTarget(booking.id, activityTargetId) && ACTIVITY_HIGHLIGHT_CLASS)}
+                        >
                           <TableCell>
                             <div className="flex items-center gap-3">
 
@@ -1282,7 +1302,14 @@ export default function PhotoshootBookings() {
                       </TableRow>
                     ) : (
                       filteredBookings.map((booking, idx) => (
-                        <TableRow key={booking.id} ref={idx === filteredBookings.length - 1 ? lastElementRef : null}>
+                        <TableRow
+                          key={booking.id}
+                          ref={(node: HTMLTableRowElement | null) => {
+                            if (idx === filteredBookings.length - 1) lastElementRef(node as unknown as HTMLDivElement);
+                            activityScrollRef(booking.id, activityTargetId)(node);
+                          }}
+                          className={cn(isActivityTarget(booking.id, activityTargetId) && ACTIVITY_HIGHLIGHT_CLASS)}
+                        >
                           <TableCell>
                             <div className="flex items-center gap-3">
 

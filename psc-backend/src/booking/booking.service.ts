@@ -40,7 +40,7 @@ export class BookingService {
 
   private applyRoomListDateFilters(
     args: any,
-    search?: { checkIn?: string; checkOut?: string },
+    search?: { bookingId?: number; checkIn?: string; checkOut?: string },
   ) {
     const hasExplicitDateFilter = !!(search?.checkIn || search?.checkOut);
 
@@ -60,7 +60,7 @@ export class BookingService {
       args.where.checkOut = { gte: d, lte: dEnd };
     }
 
-    if (!hasExplicitDateFilter) {
+    if (!hasExplicitDateFilter && !search?.bookingId) {
       const today = getPakistanDate();
       today.setHours(0, 0, 0, 0);
       args.where.checkOut = { gte: today };
@@ -77,7 +77,7 @@ export class BookingService {
 
   private applyBookingDateListFilters(
     args: any,
-    search?: { checkIn?: string; checkOut?: string },
+    search?: { bookingId?: number; checkIn?: string; checkOut?: string },
     dateField = 'bookingDate',
     endField?: string,
   ) {
@@ -91,7 +91,7 @@ export class BookingService {
       this.setDayFilter(args, endField, search.checkOut);
     }
 
-    if (!hasExplicitDateFilter) {
+    if (!hasExplicitDateFilter && !search?.bookingId) {
       const today = getPakistanDate();
       today.setHours(0, 0, 0, 0);
       if (endField) {

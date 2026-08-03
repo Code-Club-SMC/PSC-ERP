@@ -1,5 +1,6 @@
 import { usePermissionAccess } from "@/hooks/use-permissions";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,6 +47,12 @@ import {
     assignFeedbackSubCategory,
 } from "../../config/apis";
 import { cn } from "@/lib/utils";
+import {
+    ACTIVITY_HIGHLIGHT_CLASS,
+    getActivityTargetId,
+    isActivityTarget,
+    activityScrollRef,
+} from "@/utils/activityDeepLink";
 
 export default function Feedback() {
   const { canCreate, canUpdate, canDelete } = usePermissionAccess("Feedback");
@@ -57,6 +64,8 @@ export default function Feedback() {
     const [newCategory, setNewCategory] = useState("");
     const [newSubCategory, setNewSubCategory] = useState("");
     const [otherSubCategoryText, setOtherSubCategoryText] = useState("");
+    const location = useLocation();
+    const activityTargetId = useMemo(() => getActivityTargetId(location.search), [location.search]);
 
     const { data: adminUser } = useQuery({
         queryKey: ["userWho"],
@@ -67,6 +76,16 @@ export default function Feedback() {
         queryKey: ["feedbacks"],
         queryFn: getFeedbacks,
     });
+
+    useEffect(() => {
+        if (!activityTargetId || !feedbacks.length) return;
+        const targetFeedback = feedbacks.find((feedback: any) =>
+            isActivityTarget(feedback.id, activityTargetId)
+        );
+        if (targetFeedback) {
+            setSelectedFeedback(targetFeedback);
+        }
+    }, [activityTargetId, feedbacks]);
 
     const { data: categories = [] } = useQuery({
         queryKey: ["feedbackCategories"],
@@ -221,7 +240,15 @@ export default function Feedback() {
                                     </TableRow>
                                 ) : (
                                     feedbacks.map((item: any) => (
-                                        <TableRow key={item.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedFeedback(item)}>
+                                        <TableRow
+                                            key={item.id}
+                                            ref={activityScrollRef(item.id, activityTargetId)}
+                                            className={cn(
+                                                "cursor-pointer hover:bg-muted/50",
+                                                isActivityTarget(item.id, activityTargetId) && ACTIVITY_HIGHLIGHT_CLASS
+                                            )}
+                                            onClick={() => setSelectedFeedback(item)}
+                                        >
                                             <TableCell className="text-sm text-muted-foreground">
                                                 {new Date(item.createdAt).toLocaleDateString()}
                                             </TableCell>

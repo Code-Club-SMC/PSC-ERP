@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Edit, Receipt, XCircle, Loader2, NotepadText, CheckCircle, Lock, CreditCard } from "lucide-react";
 import { Booking } from "@/types/room-booking.type";
 import { formatDateTimeForDisplay } from "@/utils/pakDate";
+import { cn } from "@/lib/utils";
+import { activityScrollRef } from "@/utils/activityDeepLink";
 
 interface BookingsTableProps {
   bookings: Booking[];
@@ -20,6 +22,8 @@ interface BookingsTableProps {
   onApprove?: (booking: Booking) => void;
   onReject?: (booking: Booking) => void;
   onViewReason?: (booking: Booking) => void;
+  highlightedBookingId?: string;
+  highlightClassName?: string;
 }
 
 export const BookingsTable = React.memo(({
@@ -35,6 +39,8 @@ export const BookingsTable = React.memo(({
   onApprove,
   onReject,
   onViewReason,
+  highlightedBookingId,
+  highlightClassName,
 }: BookingsTableProps) => {
   const getGuestInfo = (booking: Booking) => {
     if (booking.pricingType === "member") return null;
@@ -96,7 +102,13 @@ export const BookingsTable = React.memo(({
           </TableHeader>
           <TableBody>
             {bookings.map((booking: Booking) => (
-              <TableRow key={booking.id}>
+              <TableRow
+                key={booking.id}
+                ref={highlightedBookingId ? activityScrollRef(booking.id, highlightedBookingId) : undefined}
+                className={cn(
+                  highlightedBookingId && booking.id?.toString() === highlightedBookingId && highlightClassName
+                )}
+              >
                 <TableCell className="font-medium">
                   {booking.Membership_No || booking.affiliatedMembershipNo}
                 </TableCell>
