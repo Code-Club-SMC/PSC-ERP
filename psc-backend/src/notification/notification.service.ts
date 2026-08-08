@@ -453,7 +453,12 @@ export class NotificationService {
     });
   }
 
-  async notifyMember(memberNo: string, title: string, description: string) {
+  async notifyMember(
+    memberNo: string,
+    title: string,
+    description: string,
+    htmlBody?: string | ((member: { Email: string | null; Name: string }) => string),
+  ) {
     try {
       const member = await this.prisma.member.findUnique({
         where: { Membership_No: memberNo },
@@ -478,8 +483,7 @@ export class NotificationService {
 
       // 3. Send Email immediately
       if (member.Email) {
-        // Basic template
-        const html = `
+        const html = typeof htmlBody === 'function' ? htmlBody(member) : htmlBody || `
           <div style="font-family: sans-serif; padding: 20px; color: #333;">
             <h2 style="color: #0056b3;">${title}</h2>
             <p>Dear ${member.Name},</p>

@@ -30,6 +30,7 @@ import {
 import { generateNumericVoucherNo, generateConsumerNumber } from 'src/utils/id';
 import * as paymentPolicies from 'src/common/config/payment-policies.json';
 import { NotificationService } from 'src/notification/notification.service';
+import { confirmations } from 'src/utils/messages';
 
 @Injectable()
 export class BookingService {
@@ -711,8 +712,9 @@ export class BookingService {
 
     this.notificationService.notifyMember(
       membershipNo,
-      'Room Booking Confirmation',
-      `New Room Booking: ${roomNumbers} from ${formatPakistanDate(checkInDate)} to ${formatPakistanDate(checkOutDate)}`
+      'Guestroom Booking Confirmation – Peshawar Services Club (PSC)',
+      `New Room Booking: ${roomNumbers} from ${formatPakistanDate(checkInDate)} to ${formatPakistanDate(checkOutDate)}`,
+      (member) => confirmations.roomBookingConfirmation(member, { name: roomNumbers }, booking),
     );
 
     return booking;
@@ -3705,8 +3707,9 @@ export class BookingService {
 
       this.notificationService.notifyMember(
         membershipNo,
-        'Hall Booking Confirmation',
-        `New Hall Booking: ${hall.name} for ${formatPakistanDate(booking)} (${eventTime})`
+        'Hall Booking Confirmation – Peshawar Services Club (PSC)',
+        `New Hall Booking: ${hall.name} for ${formatPakistanDate(booking)} (${eventTime})`,
+        (member) => confirmations.hallbookingConfirmation(member, hall, booked),
       );
 
       return booked;
@@ -4634,13 +4637,15 @@ export class BookingService {
 
       this.notificationService.notifyMember(
         membershipNo,
-        'Lawn Booking Confirmation',
-        `New Lawn Booking: ${lawn.description} for ${formatPakistanDate(booking)} (${eventTime})`
+        'Lawn Booking Confirmation – Peshawar Services Club (PSC)',
+        `New Lawn Booking: ${lawn.description} for ${formatPakistanDate(booking)} (${eventTime})`,
+        (member) => confirmations.lawnbookingConfirmation(member, lawn, booked),
       );
       this.notificationService.notifyMember(
         membershipNo,
-        'Lawn Booking Confirmation',
-        `New Lawn Booking: ${lawn.description} for ${formatPakistanDate(booking)} (${eventTime})`
+        'Lawn Booking Confirmation – Peshawar Services Club (PSC)',
+        `New Lawn Booking: ${lawn.description} for ${formatPakistanDate(booking)} (${eventTime})`,
+        (member) => confirmations.lawnbookingConfirmation(member, lawn, booked),
       );
       return { ...booked, lawnName: lawn.description };
     });
@@ -5255,8 +5260,9 @@ export class BookingService {
 
     this.notificationService.notifyMember(
       membershipNo,
-      'Photoshoot Booking Confirmation',
-      `New Photoshoot Booking for ${startTime.toLocaleDateString()} at ${startTime.toLocaleTimeString()}`
+      'Photoshoot Booking Confirmation – Peshawar Services Club (PSC)',
+      `New Photoshoot Booking for ${startTime.toLocaleDateString()} at ${startTime.toLocaleTimeString()}`,
+      (member) => confirmations.photoshootBookingConfirmation(member, photoshoot, booked),
     );
 
     return booked;

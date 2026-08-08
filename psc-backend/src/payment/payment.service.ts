@@ -34,6 +34,7 @@ import {
 import { RealtimeGateway } from 'src/realtime/realtime.gateway';
 import { NotificationService } from 'src/notification/notification.service';
 import { MailerService } from 'src/mailer/mailer.service';
+import { confirmations } from 'src/utils/messages';
 import { v4 as uuidv4 } from 'uuid';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -579,23 +580,16 @@ export class PaymentService {
       console.error('Mobile notification failed:', err);
     }
 
-    // 3. Email Notification
+    // 3. Email Notification (use professional templates)
     if (email) {
       try {
-        const subject = `Payment Confirmation - PSC`;
-        const body = `
-          <h3>Dear ${name},</h3>
-          <p>This is to confirm that your payment for <b>${voucher.booking_type}</b> booking has been successfully processed.</p>
-          <ul>
-            <li><b>Consumer No:</b> ${consumer_number}</li>
-            <li><b>Amount:</b> Rs. ${amount}</li>
-            <li><b>Transaction ID:</b> ${paymentData.tran_auth_id}</li>
-            <li><b>Date:</b> ${new Date().toLocaleDateString()}</li>
-          </ul>
-          <p>Thank you for using our services.</p>
-          <br/>
-          <p>Best Regards,<br/>PSC Team</p>
-        `;
+        const subject = `Payment Confirmation Receipt – Monthly Bill (PSC Mobile App)`;
+        const body = confirmations.billPaymentConfirmation(member || { Name: name }, {
+          amount,
+          date: new Date(),
+          reference: paymentData.tran_auth_id,
+          membershipNo: member?.Membership_No || voucher.membership_no,
+        });
         await this.mailerService.sendMail(email, [], subject, body);
       } catch (err) {
         console.error('Email notification failed:', err);
