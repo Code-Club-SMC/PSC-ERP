@@ -233,6 +233,7 @@ export function PhotoshootBookingDetailsCard({
 }: PhotoshootBookingDetailsCardProps) {
   const [activeTab, setActiveTab] = useState("info");
   const hasGuestInfo = booking.guestName && booking.pricingType === "guest";
+  const hasCoupleInfo = !!(booking.groomName || booking.brideName);
   const hasOutOfOrders = booking.photoshoot.outOfOrders && booking.photoshoot.outOfOrders.length > 0;
   const duration = calculateDuration(booking.startTime, booking.endTime);
   const isCurrentlyBooked = booking.photoshoot.isBooked;
@@ -411,6 +412,31 @@ export function PhotoshootBookingDetailsCard({
                     </div>
                   </div>
                 </div>
+
+                {hasCoupleInfo && (
+                  <div className="space-y-2">
+                    <h3 className="font-semibold text-sm flex items-center gap-2 text-gray-700">
+                      <Users className="h-4 w-4" />
+                      Couple Information
+                    </h3>
+                    <div className="p-3 bg-pink-50 border border-pink-200 rounded-md">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {booking.groomName && (
+                          <div>
+                            <Label>Groom Name</Label>
+                            <Value>{booking.groomName}</Value>
+                          </div>
+                        )}
+                        {booking.brideName && (
+                          <div>
+                            <Label>Bride Name</Label>
+                            <Value>{booking.brideName}</Value>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {hasGuestInfo && (
                   <div className="space-y-2">
