@@ -1822,6 +1822,8 @@ export class PaymentService {
         pendingAmount: totalPrice,
         guestName: bookingData.guestName,
         guestContact: bookingData.guestContact?.toString(),
+        groomName: bookingData.groomName,
+        brideName: bookingData.brideName,
         isConfirmed: false,
         paidBy: 'MEMBER',
         bookingDetails: parsedDetails || [],

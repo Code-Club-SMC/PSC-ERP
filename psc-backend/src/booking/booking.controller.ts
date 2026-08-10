@@ -279,6 +279,8 @@ export class BookingController {
     @Query('bookingId', new ParseIntPipe({ optional: true })) bookingId?: number,
     @Query('checkIn') checkIn?: string,
     @Query('checkOut') checkOut?: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
     @Query('paymentStatus') paymentStatus?: string,
     @Req() req?: any,
   ) {
@@ -287,7 +289,7 @@ export class BookingController {
       this.bookingModuleFromBookingFor(bookingFor),
       'read',
     );
-    const search = { membershipNo, bookingId, checkIn, checkOut, paymentStatus };
+    const search = { membershipNo, bookingId, checkIn, checkOut, fromDate, toDate, paymentStatus };
     if (bookingFor === 'rooms')
       return this.bookingService.gBookingsRoom(page, limit, search);
     if (bookingFor === 'halls')
@@ -308,6 +310,8 @@ export class BookingController {
     @Query('bookingId', new ParseIntPipe({ optional: true })) bookingId?: number,
     @Query('checkIn') checkIn?: string,
     @Query('checkOut') checkOut?: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
     @Query('paymentStatus') paymentStatus?: string,
     @Req() req?: any,
   ) {
@@ -316,7 +320,7 @@ export class BookingController {
       this.bookingModuleFromBookingFor(bookingFor),
       'read',
     );
-    const search = { membershipNo, bookingId, checkIn, checkOut, paymentStatus };
+    const search = { membershipNo, bookingId, checkIn, checkOut, fromDate, toDate, paymentStatus };
     if (bookingFor === 'rooms')
       return this.bookingService.gCancelledBookingsRoom(page, limit, search);
     if (bookingFor === 'halls')
@@ -337,6 +341,8 @@ export class BookingController {
     @Query('bookingId', new ParseIntPipe({ optional: true })) bookingId?: number,
     @Query('checkIn') checkIn?: string,
     @Query('checkOut') checkOut?: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
     @Query('paymentStatus') paymentStatus?: string,
     @Req() req?: any,
   ) {
@@ -345,7 +351,7 @@ export class BookingController {
       this.bookingModuleFromBookingFor(bookingFor),
       'read',
     );
-    const search = { membershipNo, bookingId, checkIn, checkOut, paymentStatus };
+    const search = { membershipNo, bookingId, checkIn, checkOut, fromDate, toDate, paymentStatus };
     if (bookingFor === 'rooms')
       return this.bookingService.gCancellationRequestsRoom(page, limit, search);
     if (bookingFor === 'halls')
@@ -364,6 +370,8 @@ export class BookingController {
     @Query('bookingId', new ParseIntPipe({ optional: true })) bookingId?: number,
     @Query('checkIn') checkIn?: string,
     @Query('checkOut') checkOut?: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
     @Query('paymentStatus') paymentStatus?: string,
     @Req() req?: any,
   ) {
@@ -372,7 +380,7 @@ export class BookingController {
       this.bookingModuleFromBookingFor(bookingFor),
       'read',
     );
-    const search = { membershipNo, bookingId, checkIn, checkOut, paymentStatus };
+    const search = { membershipNo, bookingId, checkIn, checkOut, fromDate, toDate, paymentStatus };
     if (bookingFor === 'rooms')
       return this.bookingService.gClosedBookingsRoom(page, limit, search);
     if (bookingFor === 'halls')

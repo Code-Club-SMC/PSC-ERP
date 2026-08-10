@@ -327,6 +327,8 @@ model PhotoshootBooking {
   guestName    String? @db.Text
   guestContact String? @db.Text
   guestCNIC    String? @db.Text
+  groomName    String? @db.Text
+  brideName    String? @db.Text
   paidBy       PaidBy  @default(MEMBER)
   remarks      String? @db.Text
 

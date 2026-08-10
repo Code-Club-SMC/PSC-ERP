@@ -7,9 +7,17 @@ import { Search, X } from "lucide-react";
 export interface BookingSearchFilters {
   membershipNo: string;
   bookingId: string;
-  checkIn: string;
-  checkOut: string;
+  fromDate: string;
+  toDate: string;
+  checkIn?: string;
+  checkOut?: string;
 }
+
+const getTodayDateInputValue = () => {
+  const today = new Date();
+  const timezoneOffset = today.getTimezoneOffset() * 60000;
+  return new Date(today.getTime() - timezoneOffset).toISOString().slice(0, 10);
+};
 
 interface BookingSearchFilterProps {
   filters: BookingSearchFilters;
@@ -66,7 +74,7 @@ export function BookingSearchFilter({
   );
 
   const hasAnyFilter =
-    filters.membershipNo || filters.bookingId || filters.checkIn || filters.checkOut;
+    filters.membershipNo || filters.bookingId || filters.fromDate || filters.toDate;
 
   return (
     <div className="flex flex-wrap items-end gap-3 p-3 bg-muted/30 rounded-lg border mb-4">
@@ -97,25 +105,25 @@ export function BookingSearchFilter({
         />
       </div>
 
-      {/* Check-In Date */}
+      {/* From Date */}
       <div className="space-y-1 min-w-[160px]">
         <Label className="text-xs">{checkInLabel}</Label>
         <Input
           type="date"
           className="h-8 text-xs"
-          value={filters.checkIn}
-          onChange={(e) => onChange({ ...filtersRef.current, checkIn: e.target.value })}
+          value={filters.fromDate}
+          onChange={(e) => onChange({ ...filtersRef.current, fromDate: e.target.value })}
         />
       </div>
 
-      {/* Check-Out / Event Date */}
+      {/* To Date */}
       <div className="space-y-1 min-w-[160px]">
         <Label className="text-xs">{checkOutLabel}</Label>
         <Input
           type="date"
           className="h-8 text-xs"
-          value={filters.checkOut}
-          onChange={(e) => onChange({ ...filtersRef.current, checkOut: e.target.value })}
+          value={filters.toDate}
+          onChange={(e) => onChange({ ...filtersRef.current, toDate: e.target.value })}
         />
       </div>
 
@@ -126,7 +134,7 @@ export function BookingSearchFilter({
           size="sm"
           className="h-8 text-xs text-muted-foreground hover:text-destructive"
           onClick={() =>
-            onChange({ membershipNo: "", bookingId: "", checkIn: "", checkOut: "" })
+            onChange({ membershipNo: "", bookingId: "", fromDate: getTodayDateInputValue(), toDate: "" })
           }
         >
           <X className="h-3 w-3 mr-1" />
@@ -160,25 +168,23 @@ export function applyBookingSearchFilters<T extends Record<string, any>>(
     result = result.filter((b) => b.id?.toString() === q || b.id?.toString().startsWith(q));
   }
 
-  if (filters.checkIn) {
+  if (filters.fromDate || filters.toDate) {
+    const fromTime = filters.fromDate ? new Date(`${filters.fromDate}T00:00:00`).getTime() : null;
+    const toTime = filters.toDate ? new Date(`${filters.toDate}T23:59:59`).getTime() : null;
     result = result.filter((b) => {
-      const date =
-        b.checkIn?.split("T")[0] ||
-        b.bookingDate?.split("T")[0] ||
+      const startValue =
+        b.checkIn ||
         b.bookingDate;
-      return date === filters.checkIn;
-    });
-  }
-
-  if (filters.checkOut) {
-    result = result.filter((b) => {
-      const date =
-        b.checkOut?.split("T")[0] ||
-        b.endDate?.split("T")[0] ||
+      const endValue =
+        b.checkOut ||
         b.endDate ||
-        b.bookingDate?.split("T")[0] ||
         b.bookingDate;
-      return date === filters.checkOut;
+      const startTime = startValue ? new Date(startValue).getTime() : NaN;
+      const endTime = endValue ? new Date(endValue).getTime() : startTime;
+      if (Number.isNaN(startTime) || Number.isNaN(endTime)) return false;
+      if (fromTime != null && endTime < fromTime) return false;
+      if (toTime != null && startTime > toTime) return false;
+      return true;
     });
   }
 

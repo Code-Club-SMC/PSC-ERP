@@ -6,8 +6,8 @@ export const NON_NEGATIVE_DECIMAL_PATTERN = /^(?:$|\d+(?:\.\d+)?)$/;
 
 export const VALIDATION_MESSAGES = {
   email: 'Email must be valid and have at least 3 characters before @',
-  phone: 'Phone must be valid Pakistan mobile or landline number',
-  cnic: 'CNIC must be 13 digits, with or without dashes',
+  phone: 'Guest Contact must be a valid Pakistan phone number, e.g. 03001234567, +923001234567, or 0919212753',
+  cnic: 'Guest CNIC must be 13 digits, with or without dashes, e.g. 12345-1234567-1',
   integer: 'Value must be a non-negative whole number',
   decimal: 'Value must be a non-negative number',
 };

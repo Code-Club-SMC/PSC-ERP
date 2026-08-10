@@ -37,6 +37,7 @@ import {
   isActivityTarget,
   activityScrollRef,
 } from "@/utils/activityDeepLink";
+import { validateCnic, validatePakistanPhone } from "@/utils/validation";
 
 export interface PhotoshootBooking {
   id: number;
@@ -62,6 +63,8 @@ export interface PhotoshootBooking {
   guestName?: string;
   guestContact?: string;
   guestCNIC?: string;
+  groomName?: string;
+  brideName?: string;
   createdAt?: string;
   updatedAt?: string;
   createdBy?: string;
@@ -92,6 +95,8 @@ const PhotoshootPaymentSection = React.memo(
   ({
     form,
     onChange,
+    paidBy,
+    hideHalfPaid = false,
   }: {
     form: {
       paymentStatus: string;
@@ -100,7 +105,16 @@ const PhotoshootPaymentSection = React.memo(
       pendingAmount: number;
     };
     onChange: (field: string, value: any) => void;
+    paidBy?: string;
+    hideHalfPaid?: boolean;
   }) => {
+    const isGuestPayer = paidBy === "GUEST";
+    React.useEffect(() => {
+      if (isGuestPayer && form.paymentStatus === "TO_BILL") {
+        onChange("paymentStatus", "UNPAID");
+      }
+    }, [form.paymentStatus, isGuestPayer, onChange]);
+
     const accounting = {
       paid: form.paidAmount || 0,
       owed: form.pendingAmount || 0,
@@ -125,16 +139,19 @@ const PhotoshootPaymentSection = React.memo(
           <Label>Payment Status</Label>
           <Select
             value={form.paymentStatus}
-            onValueChange={(val) => onChange("paymentStatus", val)}
+            onValueChange={(val) => {
+              if (isGuestPayer && val === "TO_BILL") return;
+              onChange("paymentStatus", val);
+            }}
           >
             <SelectTrigger className="mt-2">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="UNPAID">Unpaid</SelectItem>
-              <SelectItem value="HALF_PAID">Half Paid</SelectItem>
+              {!hideHalfPaid && <SelectItem value="HALF_PAID">Half Paid</SelectItem>}
               <SelectItem value="PAID">Paid</SelectItem>
-              <SelectItem value="TO_BILL">To Bill</SelectItem>
+              {!isGuestPayer && <SelectItem value="TO_BILL">To Bill</SelectItem>}
             </SelectContent>
           </Select>
         </div>
@@ -327,7 +344,7 @@ export default function PhotoshootBookings() {
   const [activeTab, setActiveTab] = useState("active");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [searchFilters, setSearchFilters] = useState<BookingSearchFilters>({
-    membershipNo: "", bookingId: "", checkIn: "", checkOut: "",
+    membershipNo: "", bookingId: "", fromDate: format(new Date(), "yyyy-MM-dd"), toDate: "",
   });
 
   // Form States
@@ -356,16 +373,50 @@ export default function PhotoshootBookings() {
     paidBy: "MEMBER",
     guestName: "",
     guestContact: "",
-    guestCNIC: ""
+    guestCNIC: "",
+    groomName: "",
+    brideName: "",
   })
 
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
   const { toast } = useToast();
+
+  const validateGuestContactDetails = () => {
+    const guestContactError = validatePakistanPhone(guestSec.guestContact || "", false);
+    if (guestContactError) {
+      toast({
+        title: "Invalid guest contact",
+        description: guestContactError,
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    const guestCnicError = validateCnic(guestSec.guestCNIC || "", false);
+    if (guestCnicError) {
+      toast({
+        title: "Invalid guest CNIC",
+        description: guestCnicError,
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    return true;
+  };
   const queryClient = useQueryClient();
   const { data: currentUser } = useQuery({
     queryKey: ["currentUser"],
     queryFn: userWho,
   });
+
+  useEffect(() => {
+    if (guestSec.paidBy === "GUEST" && paymentStatus === "TO_BILL") {
+      setPaymentStatus("UNPAID");
+      setPaidAmount(0);
+    }
+  }, [guestSec.paidBy, paymentStatus]);
+
   const isSuperAdmin = currentUser?.role === "SUPER_ADMIN";
   const canCreatePhotoshootBookings =
     isSuperAdmin ||
@@ -415,7 +466,8 @@ export default function PhotoshootBookings() {
   const filters = {
     membershipNo: searchFilters.membershipNo,
     bookingId: searchFilters.bookingId,
-    checkIn: searchFilters.checkIn,
+    fromDate: searchFilters.fromDate,
+    toDate: searchFilters.toDate,
     paymentStatus: statusFilter,
   };
 
@@ -603,7 +655,9 @@ export default function PhotoshootBookings() {
       paidBy: "",
       guestName: "",
       guestContact: "",
-      guestCNIC: ""
+      guestCNIC: "",
+      groomName: "",
+      brideName: "",
     });
     setPPaymentMode("CASH");
     setPCardNumber("");
@@ -695,6 +749,47 @@ export default function PhotoshootBookings() {
       paidBy: guestSec.paidBy,
       guestName: guestSec.guestName,
       guestContact: guestSec.guestContact?.toString(),
+      guestCNIC: guestSec.guestCNIC,
+      groomName: guestSec.groomName,
+      brideName: guestSec.brideName,
+    };
+  };
+
+  const buildPhotoshootPaymentUpdatePayload = () => {
+    if (!editBooking) return null;
+    const originalTotal = Number(editBooking.totalPrice) || 0;
+    const paymentPaidAmount =
+      paymentStatus === "HALF_PAID"
+        ? paidAmount
+        : paymentStatus === "PAID"
+          ? originalTotal
+          : 0;
+
+    return {
+      category: "Photoshoot",
+      id: editBooking.id,
+      membershipNo: editBooking.member.Membership_No,
+      entityId: editBooking.photoshootId.toString(),
+      checkIn: new Date(editBooking.bookingDate).toISOString().split("T")[0],
+      timeSlot: editBooking.startTime,
+      bookingDetails: (editBooking as any).bookingDetails || [],
+      totalPrice: originalTotal.toString(),
+      paymentStatus,
+      pricingType: editBooking.pricingType,
+      paidAmount: paymentPaidAmount,
+      pendingAmount: originalTotal - paymentPaidAmount,
+      paymentMode: pPaymentMode,
+      card_number: pCardNumber,
+      check_number: pCheckNumber,
+      bank_name: pBankName,
+      transaction_id: pTransactionId,
+      paid_at: pPaidAt,
+      paidBy: editBooking.paidBy,
+      guestName: editBooking.guestName,
+      guestContact: editBooking.guestContact?.toString(),
+      guestCNIC: editBooking.guestCNIC,
+      groomName: editBooking.groomName,
+      brideName: editBooking.brideName,
     };
   };
 
@@ -704,6 +799,7 @@ export default function PhotoshootBookings() {
       toast({ title: "Missing fields", description: "Please fill all required fields", variant: "destructive" });
       return;
     }
+    if (!validateGuestContactDetails()) return;
 
     // Use first slot for main fields (backward compatibility)
     const firstSlot = bookingDetails[0];
@@ -728,7 +824,10 @@ export default function PhotoshootBookings() {
       paid_at: pPaidAt,
       paidBy: guestSec.paidBy,
       guestName: guestSec.guestName,
+      guestContact: guestSec.guestContact?.toString(),
       guestCNIC: guestSec.guestCNIC,
+      groomName: guestSec.groomName,
+      brideName: guestSec.brideName,
       reservationId: firstSlot.reservationId
     };
 
@@ -737,13 +836,14 @@ export default function PhotoshootBookings() {
 
   const handleUpdate = () => {
     if (!canUpdatePhotoshootBookings) return;
+    if (!validateGuestContactDetails()) return;
     const payload = buildPhotoshootUpdatePayload();
     if (!payload) return;
     updateMutation.mutate(payload);
   };
 
   const handleSaveEditPayment = () => {
-    const payload = buildPhotoshootUpdatePayload();
+    const payload = buildPhotoshootPaymentUpdatePayload();
     if (!payload) {
       toast({
         title: "Booking details are not ready yet",
@@ -792,7 +892,9 @@ export default function PhotoshootBookings() {
         paidBy: editBooking.paidBy || "",
         guestName: editBooking.guestName || "",
         guestContact: editBooking.guestContact || "",
-        guestCNIC: editBooking.guestCNIC || ""
+        guestCNIC: editBooking.guestCNIC || "",
+        groomName: editBooking.groomName || "",
+        brideName: editBooking.brideName || "",
       });
       setPPaymentMode((editBooking as any).paymentMode || "CASH");
       setPCardNumber((editBooking as any).card_number || "");
@@ -1022,6 +1124,34 @@ export default function PhotoshootBookings() {
                   </Select>
                 </div>
 
+                <div className="p-4 rounded-xl border bg-white shadow-sm col-span-full">
+                  <h3 className="text-lg font-semibold mb-4">Couple Information</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm font-medium mb-1 block whitespace-nowrap">
+                        Groom Name
+                      </Label>
+                      <FormInput
+                        label=""
+                        type="text"
+                        value={guestSec.groomName}
+                        onChange={(val) => setGuestSec((prev) => ({ ...prev, groomName: val }))}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium mb-1 block whitespace-nowrap">
+                        Bride Name
+                      </Label>
+                      <FormInput
+                        label=""
+                        type="text"
+                        value={guestSec.brideName}
+                        onChange={(val) => setGuestSec((prev) => ({ ...prev, brideName: val }))}
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 {pricingType == "guest" && <div className="p-4 rounded-xl border bg-white shadow-sm col-span-full">
 
                   <h3 className="text-lg font-semibold mb-4">Guest Information</h3>
@@ -1051,13 +1181,25 @@ export default function PhotoshootBookings() {
 
                         <FormInput
                           label=""
-                          type="number"
+                          type="text"
                           value={guestSec.guestContact}
                           onChange={(val) => setGuestSec((prev) => ({ ...prev, guestContact: val }))}
-                          min="0"
                         />
                       </div>
 
+                    </div>
+
+                    <div className="mt-3">
+                      <Label className="text-sm font-medium mb-1 block whitespace-nowrap">
+                        Guest CNIC (Optional)
+                      </Label>
+                      <FormInput
+                        label=""
+                        type="text"
+                        value={guestSec.guestCNIC}
+                        onChange={(val) => setGuestSec((prev) => ({ ...prev, guestCNIC: val }))}
+                        placeholder="12345-1234567-1"
+                      />
                     </div>
 
                     <div className="sm:col-span-2 lg:col-span-1">
@@ -1127,8 +1269,8 @@ export default function PhotoshootBookings() {
         <BookingSearchFilter
           filters={searchFilters}
           onChange={setSearchFilters}
-          checkInLabel="Booking Date"
-          checkOutLabel="End Date"
+          checkInLabel="From Date"
+          checkOutLabel="To Date"
         />
 
         <TabsContent value="active" className="mt-0">
@@ -1546,6 +1688,34 @@ export default function PhotoshootBookings() {
             </div>
 
             <div></div>
+            <div className="p-4 rounded-xl border bg-white shadow-sm col-span-full">
+              <h3 className="text-lg font-semibold mb-4">Couple Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium mb-1 block whitespace-nowrap">
+                    Groom Name
+                  </Label>
+                  <FormInput
+                    label=""
+                    type="text"
+                    value={guestSec.groomName}
+                    onChange={(val) => setGuestSec((prev) => ({ ...prev, groomName: val }))}
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium mb-1 block whitespace-nowrap">
+                    Bride Name
+                  </Label>
+                  <FormInput
+                    label=""
+                    type="text"
+                    value={guestSec.brideName}
+                    onChange={(val) => setGuestSec((prev) => ({ ...prev, brideName: val }))}
+                  />
+                </div>
+              </div>
+            </div>
+
             {pricingType == "guest" && <div className="p-4 rounded-xl border bg-white shadow-sm col-span-full">
 
               <h3 className="text-lg font-semibold mb-4">Guest Information</h3>
@@ -1575,13 +1745,25 @@ export default function PhotoshootBookings() {
 
                     <FormInput
                       label=""
-                      type="number"
+                      type="text"
                       value={guestSec.guestContact}
                       onChange={(val) => setGuestSec((prev) => ({ ...prev, guestContact: val }))}
-                      min="0"
                     />
                   </div>
 
+                </div>
+
+                <div className="mt-3">
+                  <Label className="text-sm font-medium mb-1 block whitespace-nowrap">
+                    Guest CNIC (Optional)
+                  </Label>
+                  <FormInput
+                    label=""
+                    type="text"
+                    value={guestSec.guestCNIC}
+                    onChange={(val) => setGuestSec((prev) => ({ ...prev, guestCNIC: val }))}
+                    placeholder="12345-1234567-1"
+                  />
                 </div>
 
                 <div className="sm:col-span-2 lg:col-span-1">
@@ -1654,6 +1836,8 @@ export default function PhotoshootBookings() {
             paid_at: pPaidAt
           } as any}
           onChange={handlePaymentFieldChange}
+          paidBy={guestSec.paidBy}
+          hideHalfPaid
         />
       </BookingPaymentDialog>
 
@@ -1679,6 +1863,8 @@ export default function PhotoshootBookings() {
             paid_at: pPaidAt
           } as any}
           onChange={handlePaymentFieldChange}
+          paidBy={guestSec.paidBy}
+          hideHalfPaid
         />
       </BookingPaymentDialog>
 

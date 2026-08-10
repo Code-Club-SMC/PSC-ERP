@@ -88,6 +88,7 @@ import { parseLocalDate } from "@/utils/hallBookingUtils";
 import { format, startOfDay, addYears, subYears } from "date-fns";
 import { BookingDetailsCard } from "@/components/details/RoomBookingDets";
 import { hasModuleAction } from "@/utils/permissions";
+import { validateCnic, validatePakistanPhone } from "@/utils/validation";
 import {
   ACTIVITY_HIGHLIGHT_CLASS,
   getActivityBookingFilters,
@@ -111,7 +112,7 @@ export default function RoomBookings() {
   const [paymentFilter, setPaymentFilter] = useState("ALL");
   const [activeTab, setActiveTab] = useState("active");
   const [searchFilters, setSearchFilters] = useState<BookingSearchFilters>({
-    membershipNo: "", bookingId: "", checkIn: "", checkOut: "",
+    membershipNo: "", bookingId: "", fromDate: format(new Date(), "yyyy-MM-dd"), toDate: "",
   });
   const [form, setForm] = useState<BookingForm>(initialFormState);
   const [editForm, setEditForm] = useState<BookingForm>(initialFormState);
@@ -205,9 +206,9 @@ export default function RoomBookings() {
     isFetchingNextPage,
     isLoading: isLoadingBookings,
   } = useInfiniteQuery({
-    queryKey: ["bookings", "rooms", "active", { membershipNo: searchFilters.membershipNo, bookingId: searchFilters.bookingId, checkIn: searchFilters.checkIn, checkOut: searchFilters.checkOut, paymentStatus: paymentFilter }],
+    queryKey: ["bookings", "rooms", "active", { membershipNo: searchFilters.membershipNo, bookingId: searchFilters.bookingId, fromDate: searchFilters.fromDate, toDate: searchFilters.toDate, paymentStatus: paymentFilter }],
     queryFn: async ({ pageParam = 1 }) => {
-      const res = await getBookings({ bookingsFor: "rooms", pageParam, filters: { membershipNo: searchFilters.membershipNo, bookingId: searchFilters.bookingId, checkIn: searchFilters.checkIn, checkOut: searchFilters.checkOut, paymentStatus: paymentFilter } });
+      const res = await getBookings({ bookingsFor: "rooms", pageParam, filters: { membershipNo: searchFilters.membershipNo, bookingId: searchFilters.bookingId, fromDate: searchFilters.fromDate, toDate: searchFilters.toDate, paymentStatus: paymentFilter } });
       return res as Booking[];
     },
     initialPageParam: 1,
@@ -224,9 +225,9 @@ export default function RoomBookings() {
     isFetchingNextPage: isFetchingNextCancelled,
     isLoading: isLoadingCancelled,
   } = useInfiniteQuery({
-    queryKey: ["bookings", "rooms", "cancelled", { membershipNo: searchFilters.membershipNo, bookingId: searchFilters.bookingId, checkIn: searchFilters.checkIn, checkOut: searchFilters.checkOut, paymentStatus: paymentFilter }],
+    queryKey: ["bookings", "rooms", "cancelled", { membershipNo: searchFilters.membershipNo, bookingId: searchFilters.bookingId, fromDate: searchFilters.fromDate, toDate: searchFilters.toDate, paymentStatus: paymentFilter }],
     queryFn: async ({ pageParam = 1 }) => {
-      const res = await getCancelledBookings({ bookingsFor: "rooms", pageParam, filters: { membershipNo: searchFilters.membershipNo, bookingId: searchFilters.bookingId, checkIn: searchFilters.checkIn, checkOut: searchFilters.checkOut, paymentStatus: paymentFilter } });
+      const res = await getCancelledBookings({ bookingsFor: "rooms", pageParam, filters: { membershipNo: searchFilters.membershipNo, bookingId: searchFilters.bookingId, fromDate: searchFilters.fromDate, toDate: searchFilters.toDate, paymentStatus: paymentFilter } });
       return res as Booking[];
     },
     initialPageParam: 1,
@@ -243,9 +244,9 @@ export default function RoomBookings() {
     isFetchingNextPage: isFetchingNextRequests,
     isLoading: isLoadingRequests,
   } = useInfiniteQuery({
-    queryKey: ["bookings", "rooms", "requests", { membershipNo: searchFilters.membershipNo, bookingId: searchFilters.bookingId, checkIn: searchFilters.checkIn, checkOut: searchFilters.checkOut, paymentStatus: paymentFilter }],
+    queryKey: ["bookings", "rooms", "requests", { membershipNo: searchFilters.membershipNo, bookingId: searchFilters.bookingId, fromDate: searchFilters.fromDate, toDate: searchFilters.toDate, paymentStatus: paymentFilter }],
     queryFn: async ({ pageParam = 1 }) => {
-      const res = await getCancellationRequests({ bookingsFor: "rooms", pageParam, filters: { membershipNo: searchFilters.membershipNo, bookingId: searchFilters.bookingId, checkIn: searchFilters.checkIn, checkOut: searchFilters.checkOut, paymentStatus: paymentFilter } });
+      const res = await getCancellationRequests({ bookingsFor: "rooms", pageParam, filters: { membershipNo: searchFilters.membershipNo, bookingId: searchFilters.bookingId, fromDate: searchFilters.fromDate, toDate: searchFilters.toDate, paymentStatus: paymentFilter } });
       return res as Booking[];
     },
     initialPageParam: 1,
@@ -262,9 +263,9 @@ export default function RoomBookings() {
     isFetchingNextPage: isFetchingNextClosed,
     isLoading: isLoadingClosed,
   } = useInfiniteQuery({
-    queryKey: ["bookings", "rooms", "closed", { membershipNo: searchFilters.membershipNo, bookingId: searchFilters.bookingId, checkIn: searchFilters.checkIn, checkOut: searchFilters.checkOut, paymentStatus: paymentFilter }],
+    queryKey: ["bookings", "rooms", "closed", { membershipNo: searchFilters.membershipNo, bookingId: searchFilters.bookingId, fromDate: searchFilters.fromDate, toDate: searchFilters.toDate, paymentStatus: paymentFilter }],
     queryFn: async ({ pageParam = 1 }) => {
-      const res = await getClosedBookings({ bookingsFor: "rooms", pageParam, filters: { membershipNo: searchFilters.membershipNo, bookingId: searchFilters.bookingId, checkIn: searchFilters.checkIn, checkOut: searchFilters.checkOut, paymentStatus: paymentFilter } });
+      const res = await getClosedBookings({ bookingsFor: "rooms", pageParam, filters: { membershipNo: searchFilters.membershipNo, bookingId: searchFilters.bookingId, fromDate: searchFilters.fromDate, toDate: searchFilters.toDate, paymentStatus: paymentFilter } });
       return res as Booking[];
     },
     initialPageParam: 1,
@@ -1039,6 +1040,26 @@ export default function RoomBookings() {
       return;
     }
 
+    const guestContactError = validatePakistanPhone(form.guestContact || "", false);
+    if (guestContactError) {
+      toast({
+        title: "Invalid guest contact",
+        description: guestContactError,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const guestCnicError = validateCnic(form.guestCNIC || "", false);
+    if (guestCnicError) {
+      toast({
+        title: "Invalid guest CNIC",
+        description: guestCnicError,
+        variant: "destructive",
+      });
+      return;
+    }
+
     const checkInDate = new Date(form.checkIn);
     const checkOutDate = new Date(form.checkOut);
 
@@ -1117,6 +1138,26 @@ export default function RoomBookings() {
       return;
     }
 
+    const guestContactError = validatePakistanPhone(editForm.guestContact || "", false);
+    if (guestContactError) {
+      toast({
+        title: "Invalid guest contact",
+        description: guestContactError,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const guestCnicError = validateCnic(editForm.guestCNIC || "", false);
+    if (guestCnicError) {
+      toast({
+        title: "Invalid guest CNIC",
+        description: guestCnicError,
+        variant: "destructive",
+      });
+      return;
+    }
+
     const conflict = checkConflicts(editSelectedRoomIds, editForm.checkIn, editForm.checkOut, editBooking?.id);
     if (conflict) {
       toast({
@@ -1172,9 +1213,59 @@ export default function RoomBookings() {
     };
   };
 
+  const buildRoomPaymentUpdatePayload = () => {
+    if (!editBooking) return null;
+    const originalRoomIds = editBooking.rooms?.length
+      ? editBooking.rooms.map((r: any) => (r.room?.id || r.roomId || r.id).toString())
+      : editBooking.roomId
+        ? [editBooking.roomId.toString()]
+        : [];
+    const firstRoom = editBooking.rooms?.[0];
+    const originalRoomTypeId =
+      editBooking.roomTypeId ||
+      firstRoom?.room?.roomType?.id ||
+      firstRoom?.roomType?.id ||
+      editBooking.room?.roomType?.id;
+
+    return {
+      id: editBooking.id.toString(),
+      category: "Room",
+      membershipNo: editBooking.Membership_No,
+      subCategoryId: originalRoomTypeId?.toString() || "",
+      entityId: originalRoomIds[0] || editBooking.roomId?.toString() || "",
+      selectedRoomIds: originalRoomIds,
+      pricingType: editBooking.pricingType,
+      checkIn: new Date(editBooking.checkIn).toISOString().split("T")[0],
+      checkOut: new Date(editBooking.checkOut).toISOString().split("T")[0],
+      totalPrice: Number(editBooking.totalPrice).toString(),
+      paymentStatus: editForm.paymentStatus || editBooking.paymentStatus || "UNPAID",
+      paidAmount: editForm.paidAmount,
+      pendingAmount: editForm.pendingAmount,
+      paymentMode: editForm.paymentMode,
+      prevRoomId: editBooking.roomId?.toString(),
+      paidBy: editBooking.paidBy,
+      guestContact: editBooking.guestContact,
+      guestName: editBooking.guestName,
+      guestCNIC: editBooking.guestCNIC,
+      numberOfAdults: editBooking.numberOfAdults,
+      numberOfChildren: editBooking.numberOfChildren,
+      specialRequests: editBooking.specialRequests,
+      remarks: editBooking.remarks,
+      heads: editBooking.extraCharges || [],
+      card_number: editForm.card_number,
+      check_number: editForm.check_number,
+      bank_name: editForm.bank_name,
+      transaction_id: editForm.transaction_id,
+      paid_at: editForm.paid_at,
+      generateAdvanceVoucher: false,
+      advanceVoucherAmount: 0,
+    };
+  };
+
   const handleSaveEditPayment = () => {
     if (!editBooking) return;
-    if (!editForm.membershipNo || editSelectedRoomIds.length === 0) {
+    const payload = buildRoomPaymentUpdatePayload();
+    if (!payload) {
       toast({
         title: "Booking details are not ready yet",
         description: "Please try again in a moment",
@@ -1182,7 +1273,6 @@ export default function RoomBookings() {
       });
       return;
     }
-    const payload = buildRoomUpdatePayload();
     updateMutation.mutate(payload);
   };
 
@@ -1359,8 +1449,8 @@ export default function RoomBookings() {
         <BookingSearchFilter
           filters={searchFilters}
           onChange={setSearchFilters}
-          checkInLabel="Check-In Date"
-          checkOutLabel="Check-Out Date"
+          checkInLabel="From Date"
+          checkOutLabel="To Date"
         />
 
         <TabsContent value="active" className="m-0">

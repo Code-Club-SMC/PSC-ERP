@@ -295,6 +295,8 @@ interface BookingFilterParams {
   bookingId?: string;
   checkIn?: string;
   checkOut?: string;
+  fromDate?: string;
+  toDate?: string;
   paymentStatus?: string;
 }
 
@@ -317,6 +319,8 @@ export const getBookings = async ({
     });
     if (filters?.membershipNo) params.append("membershipNo", filters.membershipNo);
     if (filters?.bookingId) params.append("bookingId", filters.bookingId);
+    if (filters?.fromDate) params.append("fromDate", filters.fromDate);
+    if (filters?.toDate) params.append("toDate", filters.toDate);
     if (filters?.checkIn) params.append("checkIn", filters.checkIn);
     if (filters?.checkOut) params.append("checkOut", filters.checkOut);
     if (filters?.paymentStatus && filters.paymentStatus !== "ALL") params.append("paymentStatus", filters.paymentStatus);
@@ -426,6 +430,8 @@ export const getCancelledBookings = async ({
     });
     if (filters?.membershipNo) params.append("membershipNo", filters.membershipNo);
     if (filters?.bookingId) params.append("bookingId", filters.bookingId);
+    if (filters?.fromDate) params.append("fromDate", filters.fromDate);
+    if (filters?.toDate) params.append("toDate", filters.toDate);
     if (filters?.checkIn) params.append("checkIn", filters.checkIn);
     if (filters?.checkOut) params.append("checkOut", filters.checkOut);
     if (filters?.paymentStatus && filters.paymentStatus !== "ALL") params.append("paymentStatus", filters.paymentStatus);
@@ -462,6 +468,8 @@ export const getCancellationRequests = async ({
     });
     if (filters?.membershipNo) params.append("membershipNo", filters.membershipNo);
     if (filters?.bookingId) params.append("bookingId", filters.bookingId);
+    if (filters?.fromDate) params.append("fromDate", filters.fromDate);
+    if (filters?.toDate) params.append("toDate", filters.toDate);
     if (filters?.checkIn) params.append("checkIn", filters.checkIn);
     if (filters?.checkOut) params.append("checkOut", filters.checkOut);
     if (filters?.paymentStatus && filters.paymentStatus !== "ALL") params.append("paymentStatus", filters.paymentStatus);
@@ -498,6 +506,8 @@ export const getClosedBookings = async ({
     });
     if (filters?.membershipNo) params.append("membershipNo", filters.membershipNo);
     if (filters?.bookingId) params.append("bookingId", filters.bookingId);
+    if (filters?.fromDate) params.append("fromDate", filters.fromDate);
+    if (filters?.toDate) params.append("toDate", filters.toDate);
     if (filters?.checkIn) params.append("checkIn", filters.checkIn);
     if (filters?.checkOut) params.append("checkOut", filters.checkOut);
     if (filters?.paymentStatus && filters.paymentStatus !== "ALL") params.append("paymentStatus", filters.paymentStatus);

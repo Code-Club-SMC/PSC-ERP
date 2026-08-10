@@ -27,6 +27,8 @@ export function getActivityBookingFilters<T extends {
   bookingId?: string;
   checkIn?: string;
   checkOut?: string;
+  fromDate?: string;
+  toDate?: string;
 }>(search: string, currentFilters: T) {
   const targetId = getActivityTargetId(search);
   if (!targetId) return currentFilters;
@@ -37,5 +39,7 @@ export function getActivityBookingFilters<T extends {
     bookingId: targetId,
     checkIn: "",
     checkOut: "",
+    fromDate: "",
+    toDate: "",
   };
 }

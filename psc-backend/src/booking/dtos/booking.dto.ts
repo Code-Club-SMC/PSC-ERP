@@ -57,6 +57,10 @@ export class BookingDto {
   @IsOptional()
   guestName?: string;
   @IsOptional()
+  groomName?: string;
+  @IsOptional()
+  brideName?: string;
+  @IsOptional()
   @Matches(PAKISTAN_PHONE_PATTERN, { message: VALIDATION_MESSAGES.phone })
   guestContact?: string;
   @IsOptional()

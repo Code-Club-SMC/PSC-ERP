@@ -20,7 +20,7 @@ export function validatePakistanPhone(value: string, required = false): Validati
   const normalized = normalizeDigits(value);
   if (!normalized) return required ? "Contact number is required" : null;
   if (!PK_PHONE_PATTERN.test(normalized)) {
-    return "Enter Pakistan phone number, e.g. 03001234567 or 0919212753";
+    return "Enter Pakistan phone number, e.g. 03001234567, +923001234567, or 0919212753";
   }
   return null;
 }
@@ -28,7 +28,7 @@ export function validatePakistanPhone(value: string, required = false): Validati
 export function validateCnic(value: string, required = false): ValidationResult {
   const normalized = normalizeDigits(value);
   if (!normalized) return required ? "CNIC is required" : null;
-  if (!CNIC_PATTERN.test(normalized)) return "CNIC must be 13 digits";
+  if (!CNIC_PATTERN.test(normalized)) return "CNIC must be 13 digits, with or without dashes, e.g. 12345-1234567-1";
   return null;
 }
 

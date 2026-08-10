@@ -22,6 +22,14 @@ export const PaymentSection = React.memo(({
   roomCount = 0,
   isAffiliated = false,
 }: PaymentSectionProps) => {
+  const isGuestPayer = form.paidBy === "GUEST";
+
+  React.useEffect(() => {
+    if (isGuestPayer && form.paymentStatus === "TO_BILL") {
+      onChange("paymentStatus", "UNPAID");
+    }
+  }, [form.paymentStatus, isGuestPayer, onChange]);
+
   // Calculate accounting values in real-time
   const calculateRealTimeAccounting = () => {
     const total = Number(form.totalPrice) || 0;
@@ -136,7 +144,10 @@ export const PaymentSection = React.memo(({
         <Label>Payment Status</Label>
         <Select
           value={form.paymentStatus}
-          onValueChange={(val) => onChange("paymentStatus", val)}
+          onValueChange={(val) => {
+            if (isGuestPayer && val === "TO_BILL") return;
+            onChange("paymentStatus", val);
+          }}
         >
           <SelectTrigger className="mt-2">
             <SelectValue placeholder="Select Status..." />
@@ -145,7 +156,7 @@ export const PaymentSection = React.memo(({
             <SelectItem value="UNPAID">Unpaid</SelectItem>
             <SelectItem value="HALF_PAID">Half Paid</SelectItem>
             <SelectItem value="PAID">Paid</SelectItem>
-            {!isAffiliated && <SelectItem value="TO_BILL">To Bill</SelectItem>}
+            {!isAffiliated && !isGuestPayer && <SelectItem value="TO_BILL">To Bill</SelectItem>}
             <SelectItem value="ADVANCE_PAYMENT">Advance Payment</SelectItem>
           </SelectContent>
         </Select>

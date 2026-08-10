@@ -263,10 +263,10 @@ export const BookingFormComponent = React.memo(({
           <div>
             <FormInput
               label={showPaReferenceDetails ? "PA Ref Contact" : "Guest Contact"}
-              type="number"
+              type="text"
               value={form.guestContact}
               onChange={(val) => onChange("guestContact", val)}
-              min="0"
+              placeholder="03001234567 or +923001234567"
             />
           </div>
           <div>

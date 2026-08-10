@@ -95,6 +95,7 @@ import {
   isActivityTarget,
   activityScrollRef,
 } from "@/utils/activityDeepLink";
+import { validateCnic, validatePakistanPhone } from "@/utils/validation";
 import paymentRules from "../config/paymentRules.json";
 
 
@@ -107,6 +108,13 @@ const HallPaymentSection = React.memo(
     form: HallBookingForm;
     onChange: (field: keyof HallBookingForm, value: any) => void;
   }) => {
+    const isGuestPayer = form.paidBy === "GUEST";
+    React.useEffect(() => {
+      if (isGuestPayer && form.paymentStatus === "TO_BILL") {
+        onChange("paymentStatus", "UNPAID");
+      }
+    }, [form.paymentStatus, isGuestPayer, onChange]);
+
     const total = Number(form.totalPrice) || 0;
     const existing = Number(form.existingPaidAmount) || 0;
     const newPaid = Number(form.newPaymentAmount) || 0;
@@ -131,7 +139,10 @@ const HallPaymentSection = React.memo(
           <Label>Payment Status</Label>
           <Select
             value={form.paymentStatus}
-            onValueChange={(val) => onChange("paymentStatus", val)}
+            onValueChange={(val) => {
+              if (isGuestPayer && val === "TO_BILL") return;
+              onChange("paymentStatus", val);
+            }}
           >
             <SelectTrigger className="mt-2">
               <SelectValue />
@@ -140,7 +151,7 @@ const HallPaymentSection = React.memo(
               <SelectItem value="UNPAID">Unpaid</SelectItem>
               <SelectItem value="HALF_PAID">Half Paid</SelectItem>
               <SelectItem value="PAID">Paid</SelectItem>
-              <SelectItem value="TO_BILL">To Bill</SelectItem>
+              {!isGuestPayer && <SelectItem value="TO_BILL">To Bill</SelectItem>}
               <SelectItem value="ADVANCE_PAYMENT">Advance Payment</SelectItem>
             </SelectContent>
           </Select>
@@ -558,7 +569,7 @@ export default function HallBookings() {
   const [paymentFilter, setPaymentFilter] = useState("ALL");
   const [activeTab, setActiveTab] = useState("active");
   const [searchFilters, setSearchFilters] = useState<BookingSearchFilters>({
-    membershipNo: "", bookingId: "", checkIn: "", checkOut: "",
+    membershipNo: "", bookingId: "", fromDate: format(new Date(), "yyyy-MM-dd"), toDate: "",
   });
 
   const [updateReqBooking, setUpdateReqBooking] = useState<HallBooking | null>(null);
@@ -597,6 +608,30 @@ export default function HallBookings() {
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const validateGuestContactDetails = (formToValidate: Pick<HallBookingForm, "guestContact" | "guestCNIC">) => {
+    const guestContactError = validatePakistanPhone(formToValidate.guestContact || "", false);
+    if (guestContactError) {
+      toast({
+        title: "Invalid guest contact",
+        description: guestContactError,
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    const guestCnicError = validateCnic(formToValidate.guestCNIC || "", false);
+    if (guestCnicError) {
+      toast({
+        title: "Invalid guest CNIC",
+        description: guestCnicError,
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    return true;
+  };
   const { data: currentUser } = useQuery({
     queryKey: ["currentUser"],
     queryFn: userWho,
@@ -635,9 +670,9 @@ export default function HallBookings() {
     isFetchingNextPage,
     isLoading: isLoadingBookings,
   } = useInfiniteQuery({
-    queryKey: ["bookings", "halls", "active", { membershipNo: searchFilters.membershipNo, bookingId: searchFilters.bookingId, checkIn: searchFilters.checkIn, checkOut: searchFilters.checkOut, paymentStatus: paymentFilter }],
+    queryKey: ["bookings", "halls", "active", { membershipNo: searchFilters.membershipNo, bookingId: searchFilters.bookingId, fromDate: searchFilters.fromDate, toDate: searchFilters.toDate, paymentStatus: paymentFilter }],
     queryFn: async ({ pageParam = 1 }) => {
-      const res = await getBookings({ bookingsFor: "halls", pageParam, filters: { membershipNo: searchFilters.membershipNo, bookingId: searchFilters.bookingId, checkIn: searchFilters.checkIn, checkOut: searchFilters.checkOut, paymentStatus: paymentFilter } });
+      const res = await getBookings({ bookingsFor: "halls", pageParam, filters: { membershipNo: searchFilters.membershipNo, bookingId: searchFilters.bookingId, fromDate: searchFilters.fromDate, toDate: searchFilters.toDate, paymentStatus: paymentFilter } });
       return res as HallBooking[];
     },
     initialPageParam: 1,
@@ -656,9 +691,9 @@ export default function HallBookings() {
     isFetchingNextPage: isFetchingNextCancelled,
     isLoading: isLoadingCancelled,
   } = useInfiniteQuery({
-    queryKey: ["bookings", "halls", "cancelled", { membershipNo: searchFilters.membershipNo, bookingId: searchFilters.bookingId, checkIn: searchFilters.checkIn, checkOut: searchFilters.checkOut, paymentStatus: paymentFilter }],
+    queryKey: ["bookings", "halls", "cancelled", { membershipNo: searchFilters.membershipNo, bookingId: searchFilters.bookingId, fromDate: searchFilters.fromDate, toDate: searchFilters.toDate, paymentStatus: paymentFilter }],
     queryFn: async ({ pageParam = 1 }) => {
-      const res = await getCancelledBookings({ bookingsFor: "halls", pageParam, filters: { membershipNo: searchFilters.membershipNo, bookingId: searchFilters.bookingId, checkIn: searchFilters.checkIn, checkOut: searchFilters.checkOut, paymentStatus: paymentFilter } });
+      const res = await getCancelledBookings({ bookingsFor: "halls", pageParam, filters: { membershipNo: searchFilters.membershipNo, bookingId: searchFilters.bookingId, fromDate: searchFilters.fromDate, toDate: searchFilters.toDate, paymentStatus: paymentFilter } });
       return res as HallBooking[];
     },
     initialPageParam: 1,
@@ -675,9 +710,9 @@ export default function HallBookings() {
     isFetchingNextPage: isFetchingNextRequests,
     isLoading: isLoadingRequests,
   } = useInfiniteQuery({
-    queryKey: ["bookings", "halls", "requests", { membershipNo: searchFilters.membershipNo, bookingId: searchFilters.bookingId, checkIn: searchFilters.checkIn, checkOut: searchFilters.checkOut, paymentStatus: paymentFilter }],
+    queryKey: ["bookings", "halls", "requests", { membershipNo: searchFilters.membershipNo, bookingId: searchFilters.bookingId, fromDate: searchFilters.fromDate, toDate: searchFilters.toDate, paymentStatus: paymentFilter }],
     queryFn: async ({ pageParam = 1 }) => {
-      const res = await getCancellationRequests({ bookingsFor: "halls", pageParam, filters: { membershipNo: searchFilters.membershipNo, bookingId: searchFilters.bookingId, checkIn: searchFilters.checkIn, checkOut: searchFilters.checkOut, paymentStatus: paymentFilter } });
+      const res = await getCancellationRequests({ bookingsFor: "halls", pageParam, filters: { membershipNo: searchFilters.membershipNo, bookingId: searchFilters.bookingId, fromDate: searchFilters.fromDate, toDate: searchFilters.toDate, paymentStatus: paymentFilter } });
       return res as HallBooking[];
     },
     initialPageParam: 1,
@@ -694,9 +729,9 @@ export default function HallBookings() {
     isFetchingNextPage: isFetchingNextClosed,
     isLoading: isLoadingClosed,
   } = useInfiniteQuery({
-    queryKey: ["bookings", "halls", "closed", { membershipNo: searchFilters.membershipNo, bookingId: searchFilters.bookingId, checkIn: searchFilters.checkIn, checkOut: searchFilters.checkOut, paymentStatus: paymentFilter }],
+    queryKey: ["bookings", "halls", "closed", { membershipNo: searchFilters.membershipNo, bookingId: searchFilters.bookingId, fromDate: searchFilters.fromDate, toDate: searchFilters.toDate, paymentStatus: paymentFilter }],
     queryFn: async ({ pageParam = 1 }) => {
-      const res = await getBookings({ bookingsFor: "halls", pageParam, type: "closed", filters: { membershipNo: searchFilters.membershipNo, bookingId: searchFilters.bookingId, checkIn: searchFilters.checkIn, checkOut: searchFilters.checkOut, paymentStatus: paymentFilter } });
+      const res = await getBookings({ bookingsFor: "halls", pageParam, type: "closed", filters: { membershipNo: searchFilters.membershipNo, bookingId: searchFilters.bookingId, fromDate: searchFilters.fromDate, toDate: searchFilters.toDate, paymentStatus: paymentFilter } });
       return res as HallBooking[];
     },
     initialPageParam: 1,
@@ -1380,6 +1415,8 @@ export default function HallBookings() {
       return;
     }
 
+    if (!validateGuestContactDetails(editForm)) return;
+
     // Validate booking date
     const bookingDate = parseLocalDate(editForm.bookingDate);
     const today = new Date();
@@ -1463,15 +1500,50 @@ export default function HallBookings() {
       paidBy: sourceForm.paidBy,
       guestName: sourceForm.guestName,
       guestContact: sourceForm.guestContact,
+      guestCNIC: sourceForm.guestCNIC,
       remarks: sourceForm.remarks,
       bookingDetails: sourceForm.bookingDetails,
       heads: sourceForm.heads,
     };
   };
 
+  const buildHallPaymentUpdatePayload = () => {
+    if (!editBooking) return null;
+    return {
+      id: editBooking.id?.toString(),
+      category: "Hall",
+      membershipNo: editBooking.member?.Membership_No || editForm.membershipNo,
+      entityId: editBooking.hallId?.toString(),
+      bookingDate: editBooking.bookingDate,
+      eventType: editBooking.eventType,
+      eventTime: editBooking.bookingDetails?.[0]?.timeSlot || editBooking.bookingTime || "DAY",
+      endDate: editBooking.endDate || editBooking.bookingDate,
+      numberOfGuests: editBooking.numberOfGuests || 0,
+      totalPrice: Number(editBooking.totalPrice).toString(),
+      paymentStatus: editForm.paymentStatus,
+      paidAmount: editForm.paidAmount,
+      pendingAmount: editForm.pendingAmount,
+      pricingType: editBooking.pricingType,
+      paymentMode: editForm.paymentMode,
+      card_number: editForm.card_number,
+      check_number: editForm.check_number,
+      bank_name: editForm.bank_name,
+      transaction_id: editForm.transaction_id,
+      paid_at: editForm.paid_at,
+      paidBy: editBooking.paidBy || "MEMBER",
+      guestName: editBooking.guestName,
+      guestContact: editBooking.guestContact,
+      guestCNIC: editBooking.guestCNIC,
+      remarks: editBooking.remarks,
+      bookingDetails: editBooking.bookingDetails || [],
+      heads: editBooking.extraCharges || [],
+    };
+  };
+
   const handleSaveEditPayment = () => {
     if (!editBooking) return;
-    if (!editForm.membershipNo || !editForm.hallId || !editForm.bookingDate) {
+    const payload = buildHallPaymentUpdatePayload();
+    if (!payload) {
       toast({
         title: "Booking details are not ready yet",
         description: "Please try again in a moment",
@@ -1479,7 +1551,7 @@ export default function HallBookings() {
       });
       return;
     }
-    updateMutation.mutate(buildHallUpdatePayload());
+    updateMutation.mutate(payload);
   };
 
   const openEditDialog = (booking: HallBooking) => {
@@ -1892,6 +1964,21 @@ export default function HallBookings() {
                           onChange={(e) => handleFormChange("guestCNIC", e.target.value)}
                           placeholder="Guest CNIC (Optional)"
                         />
+                        <div>
+                          <Label className="text-xs">Who will Pay?</Label>
+                          <Select
+                            value={form.paidBy || "MEMBER"}
+                            onValueChange={(val) => handleFormChange("paidBy", val)}
+                          >
+                            <SelectTrigger className="mt-1">
+                              <SelectValue placeholder="Who will pay?" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="MEMBER">Member</SelectItem>
+                              <SelectItem value="GUEST">Guest</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -2186,8 +2273,8 @@ export default function HallBookings() {
         <BookingSearchFilter
           filters={searchFilters}
           onChange={setSearchFilters}
-          checkInLabel="Booking Date"
-          checkOutLabel="End Date"
+          checkInLabel="From Date"
+          checkOutLabel="To Date"
         />
 
         <Card>

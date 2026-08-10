@@ -32,6 +32,16 @@ import * as paymentPolicies from 'src/common/config/payment-policies.json';
 import { NotificationService } from 'src/notification/notification.service';
 import { confirmations } from 'src/utils/messages';
 
+type BookingListSearch = {
+  membershipNo?: string;
+  bookingId?: number;
+  checkIn?: string;
+  checkOut?: string;
+  fromDate?: string;
+  toDate?: string;
+  paymentStatus?: string;
+};
+
 @Injectable()
 export class BookingService {
   constructor(
@@ -41,31 +51,38 @@ export class BookingService {
 
   private applyRoomListDateFilters(
     args: any,
-    search?: { bookingId?: number; checkIn?: string; checkOut?: string },
+    search?: BookingListSearch,
   ) {
-    const hasExplicitDateFilter = !!(search?.checkIn || search?.checkOut);
+    const hasMembershipSearch = !!search?.membershipNo?.trim();
+    const from = search?.fromDate || search?.checkIn;
+    const to = search?.toDate || search?.checkOut;
+    const hasExplicitDateFilter = !hasMembershipSearch && !!(from || to);
 
-    if (search?.checkIn) {
-      const d = new Date(search.checkIn);
-      d.setHours(0, 0, 0, 0);
-      const dEnd = new Date(search.checkIn);
-      dEnd.setHours(23, 59, 59, 999);
-      args.where.checkIn = { gte: d, lte: dEnd };
+    if (hasExplicitDateFilter) {
+      const rangeFilters: any[] = [];
+
+      if (to) {
+        const toEnd = new Date(to);
+        toEnd.setHours(23, 59, 59, 999);
+        rangeFilters.push({ checkIn: { lte: toEnd } });
+      }
+
+      if (from) {
+        const fromStart = new Date(from);
+        fromStart.setHours(0, 0, 0, 0);
+        rangeFilters.push({ checkOut: { gte: fromStart } });
+      }
+
+      args.where.AND = [...(args.where.AND || []), ...rangeFilters];
     }
 
-    if (search?.checkOut) {
-      const d = new Date(search.checkOut);
-      d.setHours(0, 0, 0, 0);
-      const dEnd = new Date(search.checkOut);
-      dEnd.setHours(23, 59, 59, 999);
-      args.where.checkOut = { gte: d, lte: dEnd };
-    }
-
-    if (!hasExplicitDateFilter && !search?.bookingId) {
+    if (!hasMembershipSearch && !hasExplicitDateFilter && !search?.bookingId) {
       const today = getPakistanDate();
       today.setHours(0, 0, 0, 0);
       args.where.checkOut = { gte: today };
     }
+
+    this.applyMembershipSearchOrder(args, search);
   }
 
   private setDayFilter(args: any, field: string, date: string) {
@@ -78,21 +95,38 @@ export class BookingService {
 
   private applyBookingDateListFilters(
     args: any,
-    search?: { bookingId?: number; checkIn?: string; checkOut?: string },
+    search?: BookingListSearch,
     dateField = 'bookingDate',
     endField?: string,
   ) {
-    const hasExplicitDateFilter = !!(search?.checkIn || search?.checkOut);
+    const hasMembershipSearch = !!search?.membershipNo?.trim();
+    const from = search?.fromDate || search?.checkIn;
+    const to = search?.toDate || search?.checkOut;
+    const hasExplicitDateFilter = !hasMembershipSearch && !!(from || to);
 
-    if (search?.checkIn) {
-      this.setDayFilter(args, dateField, search.checkIn);
+    if (hasExplicitDateFilter) {
+      const rangeFilters: any[] = [];
+
+      if (to) {
+        const toEnd = new Date(to);
+        toEnd.setHours(23, 59, 59, 999);
+        rangeFilters.push({ [dateField]: { lte: toEnd } });
+      }
+
+      if (from) {
+        const fromStart = new Date(from);
+        fromStart.setHours(0, 0, 0, 0);
+        if (endField) {
+          rangeFilters.push({ [endField]: { gte: fromStart } });
+        } else {
+          rangeFilters.push({ [dateField]: { gte: fromStart } });
+        }
+      }
+
+      args.where.AND = [...(args.where.AND || []), ...rangeFilters];
     }
 
-    if (search?.checkOut && endField) {
-      this.setDayFilter(args, endField, search.checkOut);
-    }
-
-    if (!hasExplicitDateFilter && !search?.bookingId) {
+    if (!hasMembershipSearch && !hasExplicitDateFilter && !search?.bookingId) {
       const today = getPakistanDate();
       today.setHours(0, 0, 0, 0);
       if (endField) {
@@ -104,6 +138,14 @@ export class BookingService {
       } else {
         args.where[dateField] = { gte: today };
       }
+    }
+
+    this.applyMembershipSearchOrder(args, search);
+  }
+
+  private applyMembershipSearchOrder(args: any, search?: BookingListSearch) {
+    if (search?.membershipNo?.trim()) {
+      args.orderBy = [{ createdAt: 'desc' }, { id: 'desc' }];
     }
   }
 
@@ -1614,7 +1656,7 @@ export class BookingService {
       args.where.id = search.bookingId;
     }
     if (search?.membershipNo) {
-      args.where.Membership_No = { contains: search.membershipNo };
+      args.where.member = { Membership_No: { contains: search.membershipNo } };
     }
     this.applyBookingDateListFilters(args, search, 'bookingDate', 'endDate');
     if (search?.paymentStatus && search.paymentStatus !== 'ALL') {
@@ -1936,7 +1978,7 @@ export class BookingService {
       args.where.id = search.bookingId;
     }
     if (search?.membershipNo) {
-      args.where.Membership_No = { contains: search.membershipNo };
+      args.where.member = { Membership_No: { contains: search.membershipNo } };
     }
     this.applyBookingDateListFilters(args, search, 'bookingDate', 'endDate');
     if (search?.paymentStatus && search.paymentStatus !== 'ALL') {
@@ -1984,7 +2026,7 @@ export class BookingService {
       args.where.id = search.bookingId;
     }
     if (search?.membershipNo) {
-      args.where.Membership_No = { contains: search.membershipNo };
+      args.where.member = { Membership_No: { contains: search.membershipNo } };
     }
     this.applyBookingDateListFilters(args, search, 'bookingDate', 'endDate');
     if (search?.paymentStatus && search.paymentStatus !== 'ALL') {
@@ -3203,7 +3245,7 @@ export class BookingService {
       args.where.id = search.bookingId;
     }
     if (search?.membershipNo) {
-      args.where.Membership_No = { contains: search.membershipNo };
+      args.where.member = { Membership_No: { contains: search.membershipNo } };
     }
     this.applyBookingDateListFilters(args, search, 'bookingDate', 'endDate');
     if (search?.paymentStatus && search.paymentStatus !== 'ALL') {
@@ -5091,6 +5133,8 @@ export class BookingService {
       paidBy = 'MEMBER',
       guestName,
       guestContact,
+      groomName,
+      brideName,
       reservationId,
       card_number,
       check_number,
@@ -5198,6 +5242,8 @@ export class BookingService {
         paidBy: paidBy === 'GUEST' ? 'GUEST' : 'MEMBER',
         guestName,
         guestContact,
+        groomName,
+        brideName,
         bookingDetails: payload.bookingDetails || [],
         createdBy,
         updatedBy: '-',
@@ -5283,6 +5329,8 @@ export class BookingService {
       paidBy,
       guestName,
       guestContact,
+      groomName,
+      brideName,
       remarks,
       card_number,
       check_number,
@@ -5591,6 +5639,8 @@ export class BookingService {
         paidBy: paidBy || existing.paidBy, // Preserve existing if not provided
         guestName: guestName || existing.guestName,
         guestContact: guestContact?.toString() || existing.guestContact,
+        groomName: groomName ?? existing.groomName,
+        brideName: brideName ?? existing.brideName,
         refundReturned: false,
         bookingDetails: normalizedDetails,
         remarks: remarks ?? existing.remarks,
@@ -5716,6 +5766,8 @@ export class BookingService {
       paidBy = 'MEMBER',
       guestName,
       guestContact,
+      groomName,
+      brideName,
       card_number,
       check_number,
       bank_name,
@@ -5836,6 +5888,8 @@ export class BookingService {
           paidBy,
           guestName,
           guestContact,
+          groomName,
+          brideName,
           createdBy,
           updatedBy: '-',
           isConfirmed: true,

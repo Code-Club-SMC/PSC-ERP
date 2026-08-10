@@ -41,6 +41,7 @@ import {
   isActivityTarget,
   activityScrollRef,
 } from "@/utils/activityDeepLink";
+import { validateCnic, validatePakistanPhone } from "@/utils/validation";
 
 interface Member {
   id: number;
@@ -169,6 +170,13 @@ const LawnPaymentSection = React.memo(
     form: LawnBookingForm;
     onChange: (field: string, value: any) => void;
   }) => {
+    const isGuestPayer = form.paidBy === "GUEST";
+    React.useEffect(() => {
+      if (isGuestPayer && form.paymentStatus === "TO_BILL") {
+        onChange("paymentStatus", "UNPAID");
+      }
+    }, [form.paymentStatus, isGuestPayer, onChange]);
+
     const total = Number(form.totalPrice) || 0;
     const existing = Number(form.existingPaidAmount) || 0;
     const newPaid = Number(form.newPaymentAmount) || 0;
@@ -193,7 +201,10 @@ const LawnPaymentSection = React.memo(
           <Label>Payment Status</Label>
           <Select
             value={form.paymentStatus}
-            onValueChange={(val) => onChange("paymentStatus", val)}
+            onValueChange={(val) => {
+              if (isGuestPayer && val === "TO_BILL") return;
+              onChange("paymentStatus", val);
+            }}
           >
             <SelectTrigger className="mt-2">
               <SelectValue />
@@ -202,7 +213,7 @@ const LawnPaymentSection = React.memo(
               <SelectItem value="UNPAID">Unpaid</SelectItem>
               <SelectItem value="HALF_PAID">Half Paid</SelectItem>
               <SelectItem value="PAID">Paid</SelectItem>
-              <SelectItem value="TO_BILL">To Bill</SelectItem>
+              {!isGuestPayer && <SelectItem value="TO_BILL">To Bill</SelectItem>}
               <SelectItem value="ADVANCE_PAYMENT">Advance Payment</SelectItem>
             </SelectContent>
           </Select>
@@ -742,7 +753,7 @@ export default function LawnBookings() {
   const [viewVouchers, setViewVouchers] = useState<LawnBooking | null>(null);
   const [paymentFilter, setPaymentFilter] = useState("ALL");
   const [searchFilters, setSearchFilters] = useState<BookingSearchFilters>({
-    membershipNo: "", bookingId: "", checkIn: "", checkOut: "",
+    membershipNo: "", bookingId: "", fromDate: format(new Date(), "yyyy-MM-dd"), toDate: "",
   });
 
   const [form, setForm] = useState<LawnBookingForm>(initialForm);
@@ -776,6 +787,31 @@ export default function LawnBookings() {
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const validateGuestContactDetails = (formToValidate: Pick<LawnBookingForm, "guestContact" | "guestCNIC">) => {
+    const guestContactError = validatePakistanPhone(formToValidate.guestContact || "", false);
+    if (guestContactError) {
+      toast({
+        title: "Invalid guest contact",
+        description: guestContactError,
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    const guestCnicError = validateCnic(formToValidate.guestCNIC || "", false);
+    if (guestCnicError) {
+      toast({
+        title: "Invalid guest CNIC",
+        description: guestCnicError,
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    return true;
+  };
+
   const { data: currentUser } = useQuery({
     queryKey: ["currentUser"],
     queryFn: userWho,
@@ -847,8 +883,8 @@ export default function LawnBookings() {
   const filters = {
     membershipNo: searchFilters.membershipNo,
     bookingId: searchFilters.bookingId,
-    checkIn: searchFilters.checkIn,
-    checkOut: searchFilters.checkOut,
+    fromDate: searchFilters.fromDate,
+    toDate: searchFilters.toDate,
     paymentStatus: paymentFilter,
   };
 
@@ -1545,6 +1581,38 @@ export default function LawnBookings() {
     };
   };
 
+  const buildLawnPaymentUpdatePayload = () => {
+    if (!editBooking) return null;
+    return {
+      id: editBooking.id.toString(),
+      category: "Lawn",
+      membershipNo: editBooking.member?.Membership_No || editForm.membershipNo || "",
+      entityId: editBooking.lawnId.toString(),
+      bookingDate: editBooking.bookingDate,
+      endDate: editBooking.endDate || editBooking.bookingDate,
+      totalPrice: Number(editBooking.totalPrice).toString(),
+      paymentStatus: editForm.paymentStatus,
+      numberOfGuests: editBooking.guestsCount || editBooking.numberOfGuests || 0,
+      paidAmount: editForm.paidAmount || 0,
+      pendingAmount: editForm.pendingAmount || 0,
+      pricingType: editBooking.pricingType || "member",
+      paymentMode: editForm.paymentMode || "CASH",
+      card_number: editForm.card_number,
+      check_number: editForm.check_number,
+      bank_name: editForm.bank_name,
+      transaction_id: editForm.transaction_id,
+      paid_at: editForm.paid_at,
+      eventTime: editBooking.bookingDetails?.[0]?.timeSlot || editBooking.bookingTime || "DAY",
+      eventType: editBooking.bookingDetails?.[0]?.eventType || editBooking.eventType || "",
+      bookingDetails: editBooking.bookingDetails || [],
+      heads: editBooking.extraCharges || [],
+      paidBy: editBooking.paidBy || "MEMBER",
+      guestName: editBooking.guestName,
+      guestContact: editBooking.guestContact,
+      guestCNIC: editBooking.guestCNIC,
+    };
+  };
+
   const handleUpdateBooking = () => {
     if (!canUpdateLawnBookings) return;
     if (!editBooking) return;
@@ -1571,6 +1639,8 @@ export default function LawnBookings() {
       return;
     }
 
+    if (!validateGuestContactDetails(editForm)) return;
+
     const payload = buildLawnUpdatePayload();
     if (!payload) {
       toast({ title: "Unable to prepare booking payload", variant: "destructive" });
@@ -1582,7 +1652,7 @@ export default function LawnBookings() {
 
   const handleSaveEditPayment = () => {
     if (!editBooking) return;
-    const payload = buildLawnUpdatePayload();
+    const payload = buildLawnPaymentUpdatePayload();
     if (!payload) {
       toast({
         title: "Booking details are not ready yet",
@@ -2222,8 +2292,8 @@ export default function LawnBookings() {
         <BookingSearchFilter
           filters={searchFilters}
           onChange={setSearchFilters}
-          checkInLabel="Booking Date"
-          checkOutLabel="End Date"
+          checkInLabel="From Date"
+          checkOutLabel="To Date"
         />
 
         <Card>
