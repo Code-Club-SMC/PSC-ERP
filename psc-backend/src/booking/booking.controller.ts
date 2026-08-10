@@ -270,6 +270,24 @@ export class BookingController {
   }
 
   @UseGuards(JwtAccGuard)
+  @Patch('update/payment')
+  async updateBookingPayment(@Body() payload: Partial<BookingDto> & { paymentOnly?: boolean }, @Req() req: any) {
+    await this.assertBookingModuleAccess(
+      req,
+      this.bookingModuleFromCategory(payload.category),
+      'update',
+    );
+    const adminName = req.user?.name || 'system';
+    return await this.bookingService.uBookingPaymentOnly(
+      {
+        ...payload,
+        paymentMode: payload.paymentMode || PaymentMode.CASH,
+      },
+      adminName,
+    );
+  }
+
+  @UseGuards(JwtAccGuard)
   @Get('get/bookings/all')
   async getBookings(
     @Query('bookingsFor') bookingFor: string,

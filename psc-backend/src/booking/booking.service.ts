@@ -2508,6 +2508,218 @@ export class BookingService {
     }
   }
 
+  async uBookingPaymentOnly(payload: Partial<BookingDto>, updatedBy: string) {
+    const {
+      id,
+      category,
+      paymentStatus,
+      paidAmount,
+      paymentMode = PaymentMode.CASH,
+      card_number,
+      check_number,
+      bank_name,
+      transaction_id,
+      paid_at,
+    } = payload as any;
+
+    if (!id || !category || !paymentStatus) {
+      throw new BadRequestException('Booking ID, category, and payment status are required');
+    }
+
+    const normalizedStatus = String(paymentStatus).toUpperCase() as PaymentStatus;
+    const bookingId = Number(id);
+    const calculatePayment = (total: number) => {
+      if (normalizedStatus === PaymentStatus.PAID) return { paid: total, pending: 0 };
+      if (normalizedStatus === PaymentStatus.TO_BILL) return { paid: total, pending: 0 };
+      if (
+        normalizedStatus === PaymentStatus.HALF_PAID ||
+        normalizedStatus === PaymentStatus.ADVANCE_PAYMENT
+      ) {
+        const paid = Number(paidAmount) || 0;
+        return { paid, pending: total - paid };
+      }
+      return { paid: 0, pending: total };
+    };
+
+    if (category === 'Room') {
+      const booking = await this.prismaService.roomBooking.findUnique({
+        where: { id: bookingId },
+        include: {
+          member: true,
+          rooms: { include: { room: { include: { roomType: true } } } },
+        },
+      });
+      if (!booking) throw new NotFoundException('Room booking not found');
+      const total = Number(booking.totalPrice);
+      const { paid, pending } = calculatePayment(total);
+      const roomNumbers = booking.rooms.map((r) => r.room?.roomNumber).filter(Boolean).join(', ');
+
+      await this.handleVoucherUpdateUnified(
+        booking.id,
+        'ROOM',
+        booking.Membership_No,
+        total,
+        paid,
+        normalizedStatus,
+        total,
+        Number(booking.paidAmount),
+        booking.paymentStatus,
+        {
+          roomNumbers,
+          checkIn: booking.checkIn,
+          checkOut: booking.checkOut,
+          roomCount: booking.rooms.length,
+          transaction_id,
+          paid_at,
+          bank_name,
+        },
+        paymentMode as PaymentMode,
+        'admin',
+        updatedBy,
+        card_number,
+        check_number,
+        bank_name,
+      );
+
+      return await this.prismaService.roomBooking.update({
+        where: { id: booking.id },
+        data: { paymentStatus: normalizedStatus, paidAmount: paid, pendingAmount: pending, updatedBy },
+      });
+    }
+
+    if (category === 'Hall') {
+      const booking = await this.prismaService.hallBooking.findUnique({
+        where: { id: bookingId },
+        include: { member: true, hall: true },
+      });
+      if (!booking) throw new NotFoundException('Hall booking not found');
+      const total = Number(booking.totalPrice);
+      const { paid, pending } = calculatePayment(total);
+
+      await this.handleVoucherUpdateUnified(
+        booking.id,
+        'HALL',
+        booking.member.Membership_No,
+        total,
+        paid,
+        normalizedStatus,
+        total,
+        Number(booking.paidAmount),
+        booking.paymentStatus,
+        {
+          hallName: booking.hall?.name,
+          bookingDate: booking.bookingDate,
+          endDate: booking.endDate,
+          eventType: booking.eventType,
+          eventTime: booking.bookingTime,
+          bookingDetails: booking.bookingDetails as any[],
+          transaction_id,
+          paid_at,
+          bank_name,
+        },
+        paymentMode as PaymentMode,
+        'admin',
+        updatedBy,
+        card_number,
+        check_number,
+        bank_name,
+      );
+
+      return await this.prismaService.hallBooking.update({
+        where: { id: booking.id },
+        data: { paymentStatus: normalizedStatus, paidAmount: paid, pendingAmount: pending, updatedBy },
+      });
+    }
+
+    if (category === 'Lawn') {
+      const booking = await this.prismaService.lawnBooking.findUnique({
+        where: { id: bookingId },
+        include: { member: true, lawn: true },
+      });
+      if (!booking) throw new NotFoundException('Lawn booking not found');
+      const total = Number(booking.totalPrice);
+      const { paid, pending } = calculatePayment(total);
+
+      await this.handleVoucherUpdateUnified(
+        booking.id,
+        'LAWN',
+        booking.member.Membership_No,
+        total,
+        paid,
+        normalizedStatus,
+        total,
+        Number(booking.paidAmount),
+        booking.paymentStatus,
+        {
+          lawnName: booking.lawn?.description || 'Lawn',
+          bookingDate: booking.bookingDate,
+          endDate: booking.endDate,
+          eventTime: booking.bookingTime,
+          eventType: booking.eventType || undefined,
+          bookingDetails: booking.bookingDetails as any[],
+          transaction_id,
+          paid_at,
+          bank_name,
+        },
+        paymentMode as PaymentMode,
+        'admin',
+        updatedBy,
+        card_number,
+        check_number,
+        bank_name,
+      );
+
+      return await this.prismaService.lawnBooking.update({
+        where: { id: booking.id },
+        data: { paymentStatus: normalizedStatus, paidAmount: paid, pendingAmount: pending, updatedBy },
+      });
+    }
+
+    if (category === 'Photoshoot') {
+      const booking = await this.prismaService.photoshootBooking.findUnique({
+        where: { id: bookingId },
+        include: { member: true, photoshoot: true },
+      });
+      if (!booking) throw new NotFoundException('Photoshoot booking not found');
+      const total = Number(booking.totalPrice);
+      const { paid, pending } = calculatePayment(total);
+
+      await this.handleVoucherUpdateUnified(
+        booking.id,
+        'PHOTOSHOOT',
+        booking.member.Membership_No,
+        total,
+        paid,
+        normalizedStatus,
+        total,
+        Number(booking.paidAmount),
+        booking.paymentStatus,
+        {
+          photoshootDesc: booking.photoshoot?.description || 'Photoshoot',
+          bookingDate: booking.bookingDate,
+          eventTime: booking.startTime?.toISOString(),
+          bookingDetails: booking.bookingDetails as any[],
+          transaction_id,
+          paid_at,
+          bank_name,
+        },
+        paymentMode as PaymentMode,
+        'admin',
+        updatedBy,
+        card_number,
+        check_number,
+        bank_name,
+      );
+
+      return await this.prismaService.photoshootBooking.update({
+        where: { id: booking.id },
+        data: { paymentStatus: normalizedStatus, paidAmount: paid, pendingAmount: pending, updatedBy },
+      });
+    }
+
+    throw new BadRequestException('Invalid booking category');
+  }
+
   private async updateRoomStatus(
     oldRoomId: number,
     newRoomId: number,
@@ -3462,6 +3674,14 @@ export class BookingService {
         include: { outOfOrders: true },
       });
       if (!hall) throw new BadRequestException('Hall not found');
+      if (Number(numberOfGuests) < 1) {
+        throw new ConflictException('Guest count must be at least 1');
+      }
+      if (Number(numberOfGuests) > hall.capacity) {
+        throw new ConflictException(
+          `Guests (${numberOfGuests}) exceeds hall capacity ${hall.capacity}`,
+        );
+      }
 
       // ── TIME VALIDATION ────────────────────────────────────
       const normalizedEventTime = eventTime.toUpperCase() as
@@ -3856,6 +4076,14 @@ export class BookingService {
         include: { outOfOrders: true },
       });
       if (!hall) throw new BadRequestException('Hall not found');
+      if (Number(numberOfGuests) < 1) {
+        throw new ConflictException('Guest count must be at least 1');
+      }
+      if (Number(numberOfGuests) > hall.capacity) {
+        throw new ConflictException(
+          `Guests (${numberOfGuests}) exceeds hall capacity ${hall.capacity}`,
+        );
+      }
 
       // ── TIME VALIDATION ────────────────────────────────────
       const normalizedEventTime = eventTime.toUpperCase() as
@@ -4747,6 +4975,16 @@ export class BookingService {
       include: { outOfOrders: true },
     });
     if (!lawn) throw new NotFoundException('Lawn not found');
+    if (Number(numberOfGuests) < (lawn.minGuests || 1)) {
+      throw new ConflictException(
+        `Guests (${numberOfGuests}) below minimum ${lawn.minGuests || 1}`,
+      );
+    }
+    if (Number(numberOfGuests) > lawn.maxGuests) {
+      throw new ConflictException(
+        `Guests (${numberOfGuests}) exceeds maximum ${lawn.maxGuests}`,
+      );
+    }
 
     const booking = new Date(bookingDate);
     booking.setHours(0, 0, 0, 0);

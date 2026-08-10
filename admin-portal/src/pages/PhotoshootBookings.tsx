@@ -757,39 +757,19 @@ export default function PhotoshootBookings() {
 
   const buildPhotoshootPaymentUpdatePayload = () => {
     if (!editBooking) return null;
-    const originalTotal = Number(editBooking.totalPrice) || 0;
-    const paymentPaidAmount =
-      paymentStatus === "HALF_PAID"
-        ? paidAmount
-        : paymentStatus === "PAID"
-          ? originalTotal
-          : 0;
-
     return {
+      paymentOnly: true,
       category: "Photoshoot",
       id: editBooking.id,
-      membershipNo: editBooking.member.Membership_No,
-      entityId: editBooking.photoshootId.toString(),
-      checkIn: new Date(editBooking.bookingDate).toISOString().split("T")[0],
-      timeSlot: editBooking.startTime,
-      bookingDetails: (editBooking as any).bookingDetails || [],
-      totalPrice: originalTotal.toString(),
       paymentStatus,
-      pricingType: editBooking.pricingType,
-      paidAmount: paymentPaidAmount,
-      pendingAmount: originalTotal - paymentPaidAmount,
+      paidAmount,
+      pendingAmount: totalPrice - paidAmount,
       paymentMode: pPaymentMode,
       card_number: pCardNumber,
       check_number: pCheckNumber,
       bank_name: pBankName,
       transaction_id: pTransactionId,
       paid_at: pPaidAt,
-      paidBy: editBooking.paidBy,
-      guestName: editBooking.guestName,
-      guestContact: editBooking.guestContact?.toString(),
-      guestCNIC: editBooking.guestCNIC,
-      groomName: editBooking.groomName,
-      brideName: editBooking.brideName,
     };
   };
 

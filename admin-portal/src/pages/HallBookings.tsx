@@ -1316,6 +1316,17 @@ export default function HallBookings() {
       return;
     }
 
+    const selectedHall = availableHalls.find((hall: Hall) => hall.id.toString() === form.hallId.toString())
+      || halls.find((hall: Hall) => hall.id.toString() === form.hallId.toString());
+    if (selectedHall && form.numberOfGuests > selectedHall.capacity) {
+      toast({
+        title: "Invalid number of guests",
+        description: `Guest count must be between 1 and ${selectedHall.capacity} for this hall`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Validate paid amount for half-paid status
     if (form.paymentStatus === "HALF_PAID" && form.paidAmount <= 0) {
       toast({
@@ -1401,6 +1412,16 @@ export default function HallBookings() {
       toast({
         title: "Invalid number of guests",
         description: "Number of guests must be at least 1",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const selectedHall = halls.find((hall: Hall) => hall.id.toString() === editForm.hallId.toString());
+    if (selectedHall && editForm.numberOfGuests > selectedHall.capacity) {
+      toast({
+        title: "Invalid number of guests",
+        description: `Guest count must be between 1 and ${selectedHall.capacity} for this hall`,
         variant: "destructive",
       });
       return;
@@ -1510,33 +1531,18 @@ export default function HallBookings() {
   const buildHallPaymentUpdatePayload = () => {
     if (!editBooking) return null;
     return {
+      paymentOnly: true,
       id: editBooking.id?.toString(),
       category: "Hall",
-      membershipNo: editBooking.member?.Membership_No || editForm.membershipNo,
-      entityId: editBooking.hallId?.toString(),
-      bookingDate: editBooking.bookingDate,
-      eventType: editBooking.eventType,
-      eventTime: editBooking.bookingDetails?.[0]?.timeSlot || editBooking.bookingTime || "DAY",
-      endDate: editBooking.endDate || editBooking.bookingDate,
-      numberOfGuests: editBooking.numberOfGuests || 0,
-      totalPrice: Number(editBooking.totalPrice).toString(),
       paymentStatus: editForm.paymentStatus,
       paidAmount: editForm.paidAmount,
       pendingAmount: editForm.pendingAmount,
-      pricingType: editBooking.pricingType,
       paymentMode: editForm.paymentMode,
       card_number: editForm.card_number,
       check_number: editForm.check_number,
       bank_name: editForm.bank_name,
       transaction_id: editForm.transaction_id,
       paid_at: editForm.paid_at,
-      paidBy: editBooking.paidBy || "MEMBER",
-      guestName: editBooking.guestName,
-      guestContact: editBooking.guestContact,
-      guestCNIC: editBooking.guestCNIC,
-      remarks: editBooking.remarks,
-      bookingDetails: editBooking.bookingDetails || [],
-      heads: editBooking.extraCharges || [],
     };
   };
 
@@ -1923,7 +1929,13 @@ export default function HallBookings() {
                       onChange={(e) => handleFormChange("numberOfGuests", parseInt(e.target.value) || 0)}
                       placeholder="Enter number of guests"
                       min="1"
+                      max={form.hallId ? (availableHalls.find((hall: Hall) => hall.id.toString() === form.hallId.toString()) || halls.find((hall: Hall) => hall.id.toString() === form.hallId.toString()))?.capacity : undefined}
                     />
+                    {form.hallId && (
+                      <p className="text-xs text-muted-foreground">
+                        Allowed: 1-{(availableHalls.find((hall: Hall) => hall.id.toString() === form.hallId.toString()) || halls.find((hall: Hall) => hall.id.toString() === form.hallId.toString()))?.capacity || "selected hall capacity"}
+                      </p>
+                    )}
                   </div>
 
                   {/* Remarks */}
@@ -2718,7 +2730,13 @@ export default function HallBookings() {
                   onChange={(e) => handleEditFormChange("numberOfGuests", parseInt(e.target.value) || 0)}
                   placeholder="Enter number of guests"
                   min="1"
+                  max={editForm.hallId ? halls.find((hall: Hall) => hall.id.toString() === editForm.hallId.toString())?.capacity : undefined}
                 />
+                {editForm.hallId && (
+                  <p className="text-xs text-muted-foreground">
+                    Allowed: 1-{halls.find((hall: Hall) => hall.id.toString() === editForm.hallId.toString())?.capacity || "selected hall capacity"}
+                  </p>
+                )}
               </div>
 
               {/* Guest Information - Conditional */}

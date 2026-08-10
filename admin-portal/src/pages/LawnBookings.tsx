@@ -1584,32 +1584,18 @@ export default function LawnBookings() {
   const buildLawnPaymentUpdatePayload = () => {
     if (!editBooking) return null;
     return {
+      paymentOnly: true,
       id: editBooking.id.toString(),
       category: "Lawn",
-      membershipNo: editBooking.member?.Membership_No || editForm.membershipNo || "",
-      entityId: editBooking.lawnId.toString(),
-      bookingDate: editBooking.bookingDate,
-      endDate: editBooking.endDate || editBooking.bookingDate,
-      totalPrice: Number(editBooking.totalPrice).toString(),
       paymentStatus: editForm.paymentStatus,
-      numberOfGuests: editBooking.guestsCount || editBooking.numberOfGuests || 0,
       paidAmount: editForm.paidAmount || 0,
       pendingAmount: editForm.pendingAmount || 0,
-      pricingType: editBooking.pricingType || "member",
       paymentMode: editForm.paymentMode || "CASH",
       card_number: editForm.card_number,
       check_number: editForm.check_number,
       bank_name: editForm.bank_name,
       transaction_id: editForm.transaction_id,
       paid_at: editForm.paid_at,
-      eventTime: editBooking.bookingDetails?.[0]?.timeSlot || editBooking.bookingTime || "DAY",
-      eventType: editBooking.bookingDetails?.[0]?.eventType || editBooking.eventType || "",
-      bookingDetails: editBooking.bookingDetails || [],
-      heads: editBooking.extraCharges || [],
-      paidBy: editBooking.paidBy || "MEMBER",
-      guestName: editBooking.guestName,
-      guestContact: editBooking.guestContact,
-      guestCNIC: editBooking.guestCNIC,
     };
   };
 
@@ -1630,6 +1616,17 @@ export default function LawnBookings() {
 
     if (!editForm.numberOfGuests || editForm.numberOfGuests < 1) {
       toast({ title: "Guest count must be at least 1", variant: "destructive" });
+      return;
+    }
+
+    const selectedLawnData = availableLawns.find((l: Lawn) => l.id.toString() === editForm.lawnId.toString())
+      || (availableLawnsData as Lawn[]).find((l: Lawn) => l.id.toString() === editForm.lawnId.toString());
+    if (selectedLawnData && (editForm.numberOfGuests < (selectedLawnData.minGuests || 1) || editForm.numberOfGuests > selectedLawnData.maxGuests)) {
+      toast({
+        title: "Invalid guest count",
+        description: `Guest count must be between ${selectedLawnData.minGuests || 1} and ${selectedLawnData.maxGuests} for this lawn`,
+        variant: "destructive",
+      });
       return;
     }
 
@@ -2074,7 +2071,13 @@ export default function LawnBookings() {
                         value={form.numberOfGuests || ""}
                         onChange={(e) => handleFormChange("numberOfGuests", parseInt(e.target.value) || 0)}
                         min={form.lawnId ? availableLawns.find((l: Lawn) => l.id.toString() === form.lawnId.toString())?.minGuests || 1 : 1}
+                        max={form.lawnId ? availableLawns.find((l: Lawn) => l.id.toString() === form.lawnId.toString())?.maxGuests : undefined}
                       />
+                      {form.lawnId && (
+                        <p className="text-xs text-muted-foreground">
+                          Allowed: {availableLawns.find((l: Lawn) => l.id.toString() === form.lawnId.toString())?.minGuests || 1}-{availableLawns.find((l: Lawn) => l.id.toString() === form.lawnId.toString())?.maxGuests || "selected lawn capacity"}
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -2656,7 +2659,14 @@ export default function LawnBookings() {
                     type="number"
                     value={editForm.numberOfGuests || ""}
                     onChange={(e) => handleEditFormChange("numberOfGuests", parseInt(e.target.value) || 0)}
+                    min={editForm.lawnId ? (availableLawns.find((l: Lawn) => l.id.toString() === editForm.lawnId.toString()) || (availableLawnsData as Lawn[]).find((l: Lawn) => l.id.toString() === editForm.lawnId.toString()))?.minGuests || 1 : 1}
+                    max={editForm.lawnId ? (availableLawns.find((l: Lawn) => l.id.toString() === editForm.lawnId.toString()) || (availableLawnsData as Lawn[]).find((l: Lawn) => l.id.toString() === editForm.lawnId.toString()))?.maxGuests : undefined}
                   />
+                  {editForm.lawnId && (
+                    <p className="text-xs text-muted-foreground">
+                      Allowed: {(availableLawns.find((l: Lawn) => l.id.toString() === editForm.lawnId.toString()) || (availableLawnsData as Lawn[]).find((l: Lawn) => l.id.toString() === editForm.lawnId.toString()))?.minGuests || 1}-{(availableLawns.find((l: Lawn) => l.id.toString() === editForm.lawnId.toString()) || (availableLawnsData as Lawn[]).find((l: Lawn) => l.id.toString() === editForm.lawnId.toString()))?.maxGuests || "selected lawn capacity"}
+                    </p>
+                  )}
                 </div>
               </div>
 

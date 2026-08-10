@@ -1215,50 +1215,19 @@ export default function RoomBookings() {
 
   const buildRoomPaymentUpdatePayload = () => {
     if (!editBooking) return null;
-    const originalRoomIds = editBooking.rooms?.length
-      ? editBooking.rooms.map((r: any) => (r.room?.id || r.roomId || r.id).toString())
-      : editBooking.roomId
-        ? [editBooking.roomId.toString()]
-        : [];
-    const firstRoom = editBooking.rooms?.[0];
-    const originalRoomTypeId =
-      editBooking.roomTypeId ||
-      firstRoom?.room?.roomType?.id ||
-      firstRoom?.roomType?.id ||
-      editBooking.room?.roomType?.id;
-
     return {
+      paymentOnly: true,
       id: editBooking.id.toString(),
       category: "Room",
-      membershipNo: editBooking.Membership_No,
-      subCategoryId: originalRoomTypeId?.toString() || "",
-      entityId: originalRoomIds[0] || editBooking.roomId?.toString() || "",
-      selectedRoomIds: originalRoomIds,
-      pricingType: editBooking.pricingType,
-      checkIn: new Date(editBooking.checkIn).toISOString().split("T")[0],
-      checkOut: new Date(editBooking.checkOut).toISOString().split("T")[0],
-      totalPrice: Number(editBooking.totalPrice).toString(),
       paymentStatus: editForm.paymentStatus || editBooking.paymentStatus || "UNPAID",
       paidAmount: editForm.paidAmount,
       pendingAmount: editForm.pendingAmount,
       paymentMode: editForm.paymentMode,
-      prevRoomId: editBooking.roomId?.toString(),
-      paidBy: editBooking.paidBy,
-      guestContact: editBooking.guestContact,
-      guestName: editBooking.guestName,
-      guestCNIC: editBooking.guestCNIC,
-      numberOfAdults: editBooking.numberOfAdults,
-      numberOfChildren: editBooking.numberOfChildren,
-      specialRequests: editBooking.specialRequests,
-      remarks: editBooking.remarks,
-      heads: editBooking.extraCharges || [],
       card_number: editForm.card_number,
       check_number: editForm.check_number,
       bank_name: editForm.bank_name,
       transaction_id: editForm.transaction_id,
       paid_at: editForm.paid_at,
-      generateAdvanceVoucher: false,
-      advanceVoucherAmount: 0,
     };
   };
 
