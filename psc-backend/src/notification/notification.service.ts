@@ -414,7 +414,7 @@ export class NotificationService {
         deliveries: {
           some: {
             AND: [
-              { member: membershipNo },
+              { member: membershipNo.toString() },
               { seen: false }
             ]
           },

@@ -109,7 +109,7 @@ export class MemberService {
       throw new HttpException('Member not found', HttpStatus.NOT_FOUND);
 
     const updateData: any = {
-      Membership_No: payload.Membership_No,
+      Membership_No: payload.Membership_No?.toString(),
       Name: payload.Name,
       Email: payload.Email,
       Contact_No: payload.Contact_No,
@@ -131,7 +131,7 @@ export class MemberService {
 
   async updateFCMToken(memberID: string, fcmToken: string) {
     return this.prismaService.member.update({
-      where: { Membership_No: memberID },
+      where: { Membership_No: memberID.toString() },
       data: { FCMToken: fcmToken },
     });
   }
