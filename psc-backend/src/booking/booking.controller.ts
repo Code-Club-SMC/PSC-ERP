@@ -607,43 +607,43 @@ export class BookingController {
     return await this.bookingService.cancelUnpaidBooking(consumer_number, req.user?.id);
   }
 
-  @ModuleAccess(MODULES.BOOKINGS)
-  @ActionAccess('update')
+  // @ModuleAccess(MODULES.BOOKINGS)
+  // @ActionAccess('update')
   @Get('sync/guest-rooms')
   async getGuestRoomData(@Query('limit') limit?: number) {
     return await this.bookingService.syncRooms(limit);
   }
 
-  @ModuleAccess(MODULES.BOOKINGS)
-  @ActionAccess('update')
+  // @ModuleAccess(MODULES.BOOKINGS)
+  // @ActionAccess('update')
   @Get('sync/affiliated-rooms')
   async getAffiliatedRoomSyncData(@Query('limit') limit?: number) {
     return await this.bookingService.syncAffiliatedRooms(limit);
   }
 
-  @ModuleAccess(MODULES.BOOKINGS)
-  @ActionAccess('update')
+  // @ModuleAccess(MODULES.BOOKINGS)
+  // @ActionAccess('update')
   @Get('sync/halls')
   async getHallSyncData(@Query('limit') limit?: number) {
     return await this.bookingService.syncHalls(limit);
   }
 
-  @ModuleAccess(MODULES.BOOKINGS)
-  @ActionAccess('update')
+  // @ModuleAccess(MODULES.BOOKINGS)
+  // @ActionAccess('update')
   @Get('sync/lawns')
   async getLawnSyncData(@Query('limit') limit?: number) {
     return await this.bookingService.syncLawns(limit);
   }
 
-  @ModuleAccess(MODULES.BOOKINGS)
-  @ActionAccess('update')
+  // @ModuleAccess(MODULES.BOOKINGS)
+  // @ActionAccess('update')
   @Get('sync/photoshoots')
   async getPhotoshootSyncData(@Query('limit') limit?: number) {
     return await this.bookingService.syncPhotoshoots(limit);
   }
 
-  @ModuleAccess(MODULES.BOOKINGS)
-  @ActionAccess('update')
+  // @ModuleAccess(MODULES.BOOKINGS)
+  // @ActionAccess('update')
   @Post('sync/response')
   async syncResponse(
     @Body()
