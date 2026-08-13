@@ -610,8 +610,36 @@ export class BookingController {
   @ModuleAccess(MODULES.BOOKINGS)
   @ActionAccess('update')
   @Get('sync/guest-rooms')
-  async getGuestRoomData() {
-    return await this.bookingService.sync();
+  async getGuestRoomData(@Query('limit') limit?: number) {
+    return await this.bookingService.syncRooms(limit);
+  }
+
+  @ModuleAccess(MODULES.BOOKINGS)
+  @ActionAccess('update')
+  @Get('sync/affiliated-rooms')
+  async getAffiliatedRoomSyncData(@Query('limit') limit?: number) {
+    return await this.bookingService.syncAffiliatedRooms(limit);
+  }
+
+  @ModuleAccess(MODULES.BOOKINGS)
+  @ActionAccess('update')
+  @Get('sync/halls')
+  async getHallSyncData(@Query('limit') limit?: number) {
+    return await this.bookingService.syncHalls(limit);
+  }
+
+  @ModuleAccess(MODULES.BOOKINGS)
+  @ActionAccess('update')
+  @Get('sync/lawns')
+  async getLawnSyncData(@Query('limit') limit?: number) {
+    return await this.bookingService.syncLawns(limit);
+  }
+
+  @ModuleAccess(MODULES.BOOKINGS)
+  @ActionAccess('update')
+  @Get('sync/photoshoots')
+  async getPhotoshootSyncData(@Query('limit') limit?: number) {
+    return await this.bookingService.syncPhotoshoots(limit);
   }
 
   @ModuleAccess(MODULES.BOOKINGS)
@@ -621,6 +649,7 @@ export class BookingController {
     @Body()
     payload: {
       results: {
+        booking_type?: string;
         booking_id: number;
         local_sync_id: string;
         local_sync_status: number;

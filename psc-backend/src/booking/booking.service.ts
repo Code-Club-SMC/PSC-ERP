@@ -1266,6 +1266,7 @@ export class BookingService {
         refundAmount,
         refundReturned: false,
         updatedBy,
+        ...this.requeueLocalSync(),
       } as any,
     });
 
@@ -1615,6 +1616,7 @@ export class BookingService {
           refundAmount: refundAmount,
           isClosed: true,
           updatedBy: closedBy,
+          ...this.requeueLocalSync(),
         },
       });
     } else {
@@ -1624,6 +1626,7 @@ export class BookingService {
         data: {
           isClosed: true,
           updatedBy: closedBy,
+          ...this.requeueLocalSync(),
         },
       });
     }
@@ -1735,6 +1738,7 @@ export class BookingService {
           refundAmount: refundAmount,
           isClosed: true,
           updatedBy: closedBy,
+          ...this.requeueLocalSync(),
         },
       });
     } else {
@@ -1743,6 +1747,7 @@ export class BookingService {
         data: {
           isClosed: true,
           updatedBy: closedBy,
+          ...this.requeueLocalSync(),
         },
       });
     }
@@ -1854,6 +1859,7 @@ export class BookingService {
           refundAmount: refundAmount,
           isClosed: true,
           updatedBy: closedBy,
+          ...this.requeueLocalSync(),
         },
       });
     } else {
@@ -1862,6 +1868,7 @@ export class BookingService {
         data: {
           isClosed: true,
           updatedBy: closedBy,
+          ...this.requeueLocalSync(),
         },
       });
     }
@@ -1938,6 +1945,7 @@ export class BookingService {
           refundAmount: refundAmount,
           isClosed: true,
           updatedBy: closedBy,
+          ...this.requeueLocalSync(),
         },
       });
     } else {
@@ -1946,6 +1954,7 @@ export class BookingService {
         data: {
           isClosed: true,
           updatedBy: closedBy,
+          ...this.requeueLocalSync(),
         },
       });
     }
@@ -2583,7 +2592,13 @@ export class BookingService {
 
       return await this.prismaService.roomBooking.update({
         where: { id: booking.id },
-        data: { paymentStatus: normalizedStatus, paidAmount: paid, pendingAmount: pending, updatedBy },
+        data: {
+          paymentStatus: normalizedStatus,
+          paidAmount: paid,
+          pendingAmount: pending,
+          updatedBy,
+          ...this.requeueLocalSync(),
+        },
       });
     }
 
@@ -2627,7 +2642,13 @@ export class BookingService {
 
       return await this.prismaService.hallBooking.update({
         where: { id: booking.id },
-        data: { paymentStatus: normalizedStatus, paidAmount: paid, pendingAmount: pending, updatedBy },
+        data: {
+          paymentStatus: normalizedStatus,
+          paidAmount: paid,
+          pendingAmount: pending,
+          updatedBy,
+          ...this.requeueLocalSync(),
+        },
       });
     }
 
@@ -2671,7 +2692,13 @@ export class BookingService {
 
       return await this.prismaService.lawnBooking.update({
         where: { id: booking.id },
-        data: { paymentStatus: normalizedStatus, paidAmount: paid, pendingAmount: pending, updatedBy },
+        data: {
+          paymentStatus: normalizedStatus,
+          paidAmount: paid,
+          pendingAmount: pending,
+          updatedBy,
+          ...this.requeueLocalSync(),
+        },
       });
     }
 
@@ -2713,7 +2740,13 @@ export class BookingService {
 
       return await this.prismaService.photoshootBooking.update({
         where: { id: booking.id },
-        data: { paymentStatus: normalizedStatus, paidAmount: paid, pendingAmount: pending, updatedBy },
+        data: {
+          paymentStatus: normalizedStatus,
+          paidAmount: paid,
+          pendingAmount: pending,
+          updatedBy,
+          ...this.requeueLocalSync(),
+        },
       });
     }
 
@@ -3074,6 +3107,7 @@ export class BookingService {
       data: {
         isCancelled: true,
         refundAmount: refundAmount,
+        ...this.requeueLocalSync(),
       },
     });
   }
@@ -3164,6 +3198,7 @@ export class BookingService {
       data: {
         isCancelled: true,
         refundAmount: refundAmount,
+        ...this.requeueLocalSync(),
       },
     });
   }
@@ -3251,6 +3286,7 @@ export class BookingService {
       data: {
         isCancelled: true,
         refundAmount: refundAmount,
+        ...this.requeueLocalSync(),
       },
     });
   }
@@ -3333,6 +3369,7 @@ export class BookingService {
       data: {
         isCancelled: true,
         refundAmount: refundAmount,
+        ...this.requeueLocalSync(),
       },
     });
   }
@@ -3414,6 +3451,7 @@ export class BookingService {
       where: { id: bookingId },
       data: {
         isCancelled: true,
+        ...this.requeueLocalSync(),
       },
     });
   }
@@ -4345,6 +4383,7 @@ export class BookingService {
           refundReturned: false,
           extraCharges: heads,
           updatedBy,
+          ...this.requeueLocalSync(),
         } as any,
       });
 
@@ -5245,6 +5284,7 @@ export class BookingService {
           extraCharges: heads ?? [],
           updatedBy,
           remarks: remarks || existing.remarks,
+          ...this.requeueLocalSync(),
         },
       });
 
@@ -5883,6 +5923,7 @@ export class BookingService {
         bookingDetails: normalizedDetails,
         remarks: remarks ?? existing.remarks,
         updatedBy,
+        ...this.requeueLocalSync(),
       },
     });
 
@@ -6410,6 +6451,7 @@ export class BookingService {
         guestContact: guestContact?.toString(),
         refundReturned: false,
         updatedBy,
+        ...this.requeueLocalSync(),
       },
     });
 
@@ -6886,7 +6928,11 @@ export class BookingService {
           // Mark booking as cancelled
           await prisma.roomBooking.update({
             where: { id: booking_id || undefined },
-            data: { isCancelled: true, remarks: "Cancelled by Member on Payment Screen" },
+            data: {
+              isCancelled: true,
+              remarks: "Cancelled by Member on Payment Screen",
+              ...this.requeueLocalSync(),
+            },
           });
         }
       } else if (booking_type === 'HALL' && booking_id) {
@@ -6904,7 +6950,11 @@ export class BookingService {
           });
           await prisma.hallBooking.update({
             where: { id: booking_id || undefined },
-            data: { isCancelled: true, remarks: "Cancelled by Member on Payment Screen" },
+            data: {
+              isCancelled: true,
+              remarks: "Cancelled by Member on Payment Screen",
+              ...this.requeueLocalSync(),
+            },
           });
         }
       } else if (booking_type === 'LAWN' && booking_id) {
@@ -6922,7 +6972,10 @@ export class BookingService {
           });
           await prisma.lawnBooking.update({
             where: { id: booking_id || undefined },
-            data: { isCancelled: true },
+            data: {
+              isCancelled: true,
+              ...this.requeueLocalSync(),
+            },
           });
         }
       } else if (booking_type === 'PHOTOSHOOT' && booking_id) {
@@ -6937,7 +6990,10 @@ export class BookingService {
           }
           await prisma.photoshootBooking.update({
             where: { id: booking_id || undefined },
-            data: { isCancelled: true },
+            data: {
+              isCancelled: true,
+              ...this.requeueLocalSync(),
+            },
           });
         }
       }
@@ -7706,6 +7762,7 @@ export class BookingService {
         guestCNIC: guestCNIC ?? booking.guestCNIC,
         extraCharges: heads || booking.extraCharges || [],
         updatedBy,
+        ...this.requeueLocalSync(),
       },
     });
 
@@ -7742,94 +7799,583 @@ export class BookingService {
   }
 
 
-  async sync() {
+  private normalizeSyncLimit(limit?: number) {
+    const value = Number(limit) || 100;
+    return Math.min(Math.max(value, 1), 500);
+  }
+
+  private syncVoucherSelect() {
+    return {
+      booking_id: true,
+      id: true,
+      consumer_number: true,
+      booking_type: true,
+      amount: true,
+      payment_mode: true,
+      invoice_no: true,
+      transaction_id: true,
+      card_number: true,
+      check_number: true,
+      bank_name: true,
+      voucher_type: true,
+      status: true,
+      remarks: true,
+      issued_by: true,
+      issued_at: true,
+      expiresAt: true,
+      paid_at: true,
+    };
+  }
+
+  private requeueLocalSync() {
+    return {
+      local_sync: 0,
+      local_sync_status: null,
+      sync_datetime: null,
+      local_sync_message: null,
+    };
+  }
+
+  private groupSyncVouchers(vouchers: any[]) {
+    const grouped = new Map<number, any[]>();
+    for (const voucher of vouchers) {
+      const list = grouped.get(voucher.booking_id) || [];
+      list.push(this.normalizeSyncVoucher(voucher));
+      grouped.set(voucher.booking_id, list);
+    }
+    return grouped;
+  }
+
+  private toSyncAmount(value: any) {
+    return Number(value || 0).toFixed(2);
+  }
+
+  private normalizeSyncHead(head: any) {
+    return {
+      name: head?.head ?? head?.name ?? null,
+      amount: this.toSyncAmount(head?.amount),
+      amount_for_gst: head?.baseAmount !== undefined && head?.baseAmount !== null
+        ? this.toSyncAmount(head.baseAmount)
+        : null,
+      gst_percent: head?.gstPercent !== undefined && head?.gstPercent !== null
+        ? Number(head.gstPercent)
+        : 0,
+      gst_amount: head?.gstAmount !== undefined && head?.gstAmount !== null
+        ? this.toSyncAmount(head.gstAmount)
+        : this.toSyncAmount(0),
+    };
+  }
+
+  private normalizeSyncVoucher(voucher: any) {
+    return {
+      id: voucher.id,
+      consumer_number: voucher.consumer_number,
+      booking_type: voucher.booking_type,
+      booking_id: voucher.booking_id,
+      amount: this.toSyncAmount(voucher.amount),
+      payment_mode: voucher.payment_mode,
+      invoice_no: voucher.invoice_no,
+      transaction_id: voucher.transaction_id,
+      card_number: voucher.card_number,
+      check_number: voucher.check_number,
+      bank_name: voucher.bank_name,
+      voucher_type: voucher.voucher_type,
+      status: voucher.status,
+      remarks: voucher.remarks,
+      issued_by: voucher.issued_by,
+      issued_at: voucher.issued_at,
+      expires_at: voucher.expiresAt,
+      paid_at: voucher.paid_at,
+    };
+  }
+
+  private normalizeSyncMember(member: any) {
+    if (!member) return null;
+    return {
+      membership_no: member.Membership_No,
+      name: member.Name,
+      balance: this.toSyncAmount(member.Balance),
+    };
+  }
+
+  private buildSyncGuest(booking: any) {
+    return {
+      name: booking.guestName ?? null,
+      cnic: booking.guestCNIC ?? null,
+      phone: booking.guestContact ?? null,
+    };
+  }
+
+  private buildSyncPayer(booking: any, member?: any) {
+    if (booking.paidBy === 'GUEST') {
+      return {
+        type: 'GUEST',
+        name: booking.guestName ?? null,
+        cnic: booking.guestCNIC ?? null,
+        phone: booking.guestContact ?? null,
+      };
+    }
+    return {
+      type: booking.paidBy ?? 'MEMBER',
+      membership_no: member?.Membership_No ?? booking.Membership_No ?? null,
+      name: member?.Name ?? null,
+    };
+  }
+
+  private buildSyncPaymentDets(booking: any, vouchers: any[] = []) {
+    const heads = Array.isArray(booking.extraCharges)
+      ? booking.extraCharges.map((head) => this.normalizeSyncHead(head))
+      : [];
+    const headsTotal = heads.reduce((sum, head) => sum + Number(head.amount || 0), 0);
+    const totalAmount = Number(booking.totalPrice || 0);
+
+    return {
+      base_amount: this.toSyncAmount(Math.max(0, totalAmount - headsTotal)),
+      heads,
+      heads_total: this.toSyncAmount(headsTotal),
+      total_amount: this.toSyncAmount(booking.totalPrice),
+      paid_amount: this.toSyncAmount(booking.paidAmount),
+      pending_amount: this.toSyncAmount(booking.pendingAmount),
+      refund_amount: this.toSyncAmount(booking.refundAmount),
+      payment_status: booking.paymentStatus,
+      vouchers,
+    };
+  }
+
+  private buildSyncDets(booking: any) {
+    return {
+      local_sync: booking.local_sync,
+      local_sync_id: booking.local_sync_id,
+      local_sync_status: booking.local_sync_status,
+      sync_datetime: booking.sync_datetime,
+      local_sync_message: booking.local_sync_message,
+    };
+  }
+
+  private normalizeSyncRooms(rooms: any[]) {
+    return (rooms || []).map((item) => ({
+      id: item.room?.id ?? item.roomId,
+      room_number: item.room?.roomNumber ?? null,
+      room_type_id: item.room?.roomTypeId ?? null,
+      room_type_name: item.room?.roomType?.type ?? null,
+      price_at_booking: this.toSyncAmount(item.priceAtBooking),
+    }));
+  }
+
+  private mapRoomSyncBooking(booking: any, vouchers: any[]) {
+    return {
+      booking_type: 'ROOM',
+      booking_id: booking.id,
+      booking_dets: {
+        booking_date: booking.createdAt,
+        check_in: booking.checkIn,
+        check_out: booking.checkOut,
+        is_confirmed: booking.isConfirmed,
+        is_cancelled: booking.isCancelled,
+        is_closed: booking.isClosed,
+        member: this.normalizeSyncMember(booking.member),
+        guest: this.buildSyncGuest(booking),
+        payer: this.buildSyncPayer(booking, booking.member),
+        rooms: this.normalizeSyncRooms(booking.rooms),
+        pricing_type: booking.pricingType,
+        number_of_adults: booking.numberOfAdults,
+        number_of_children: booking.numberOfChildren,
+        special_requests: booking.specialRequests,
+        remarks: booking.remarks,
+      },
+      payment_dets: this.buildSyncPaymentDets(booking, vouchers),
+      sync_dets: this.buildSyncDets(booking),
+    };
+  }
+
+  private mapAffiliatedRoomSyncBooking(booking: any, vouchers: any[]) {
+    return {
+      booking_type: 'AFF_ROOM',
+      booking_id: booking.id,
+      booking_dets: {
+        booking_date: booking.createdAt,
+        check_in: booking.checkIn,
+        check_out: booking.checkOut,
+        is_confirmed: booking.isConfirmed,
+        is_cancelled: booking.isCancelled,
+        is_closed: booking.isClosed,
+        affiliated_club: booking.affiliatedClub
+          ? {
+            id: booking.affiliatedClub.id,
+            name: booking.affiliatedClub.name,
+            location: booking.affiliatedClub.location,
+            contact_no: booking.affiliatedClub.contactNo,
+            email: booking.affiliatedClub.email,
+            description: booking.affiliatedClub.description,
+          }
+          : null,
+        affiliated_membership_no: booking.affiliatedMembershipNo,
+        guest: this.buildSyncGuest(booking),
+        payer: {
+          type: 'AFFILIATED_MEMBER',
+          affiliated_membership_no: booking.affiliatedMembershipNo,
+          name: booking.guestName ?? null,
+        },
+        rooms: this.normalizeSyncRooms(booking.rooms),
+        number_of_adults: booking.numberOfAdults,
+        number_of_children: booking.numberOfChildren,
+        special_requests: booking.specialRequests,
+        remarks: booking.remarks,
+      },
+      payment_dets: this.buildSyncPaymentDets(booking, vouchers),
+      sync_dets: this.buildSyncDets(booking),
+    };
+  }
+
+  private mapHallSyncBooking(booking: any, vouchers: any[]) {
+    return {
+      booking_type: 'HALL',
+      booking_id: booking.id,
+      booking_dets: {
+        booking_date: booking.bookingDate,
+        end_date: booking.endDate,
+        booking_time: booking.bookingTime,
+        event_type: booking.eventType,
+        number_of_guests: booking.numberOfGuests,
+        number_of_days: booking.numberOfDays,
+        is_confirmed: booking.isConfirmed,
+        is_cancelled: booking.isCancelled,
+        is_closed: booking.isClosed,
+        member: this.normalizeSyncMember(booking.member),
+        guest: this.buildSyncGuest(booking),
+        payer: this.buildSyncPayer(booking, booking.member),
+        resource: booking.hall
+          ? {
+            id: booking.hall.id,
+            name: booking.hall.name,
+            description: booking.hall.description,
+            capacity: booking.hall.capacity,
+          }
+          : null,
+        pricing_type: booking.pricingType,
+        remarks: booking.remarks,
+      },
+      payment_dets: this.buildSyncPaymentDets(booking, vouchers),
+      sync_dets: this.buildSyncDets(booking),
+    };
+  }
+
+  private mapLawnSyncBooking(booking: any, vouchers: any[]) {
+    return {
+      booking_type: 'LAWN',
+      booking_id: booking.id,
+      booking_dets: {
+        booking_date: booking.bookingDate,
+        end_date: booking.endDate,
+        booking_time: booking.bookingTime,
+        event_type: booking.eventType,
+        number_of_guests: booking.guestsCount,
+        number_of_days: booking.numberOfDays,
+        is_confirmed: booking.isConfirmed,
+        is_cancelled: booking.isCancelled,
+        is_closed: booking.isClosed,
+        member: this.normalizeSyncMember(booking.member),
+        guest: this.buildSyncGuest(booking),
+        payer: this.buildSyncPayer(booking, booking.member),
+        resource: booking.lawn
+          ? {
+            id: booking.lawn.id,
+            description: booking.lawn.description,
+            category_id: booking.lawn.lawnCategoryId,
+            category_name: booking.lawn.lawnCategory?.category ?? null,
+            min_guests: booking.lawn.minGuests,
+            max_guests: booking.lawn.maxGuests,
+          }
+          : null,
+        pricing_type: booking.pricingType,
+        remarks: booking.remarks,
+      },
+      payment_dets: this.buildSyncPaymentDets(booking, vouchers),
+      sync_dets: this.buildSyncDets(booking),
+    };
+  }
+
+  private mapPhotoshootSyncBooking(booking: any, vouchers: any[]) {
+    return {
+      booking_type: 'PHOTOSHOOT',
+      booking_id: booking.id,
+      booking_dets: {
+        booking_date: booking.bookingDate,
+        start_time: booking.startTime,
+        end_time: booking.endTime,
+        is_confirmed: booking.isConfirmed,
+        is_cancelled: booking.isCancelled,
+        member: this.normalizeSyncMember(booking.member),
+        guest: this.buildSyncGuest(booking),
+        payer: this.buildSyncPayer(booking, booking.member),
+        resource: booking.photoshoot
+          ? {
+            id: booking.photoshoot.id,
+            description: booking.photoshoot.description,
+          }
+          : null,
+        groom_name: booking.groomName,
+        bride_name: booking.brideName,
+        pricing_type: booking.pricingType,
+        remarks: booking.remarks,
+      },
+      payment_dets: this.buildSyncPaymentDets(booking, vouchers),
+      sync_dets: this.buildSyncDets(booking),
+    };
+  }
+
+  private async getSyncVouchers(bookingIds: number[], bookingType: BookingType | 'AFF_ROOM') {
+    if (!bookingIds.length) return [];
+    return await this.prismaService.paymentVoucher.findMany({
+      where: {
+        booking_id: { in: bookingIds },
+        booking_type: bookingType as any,
+      },
+      select: this.syncVoucherSelect(),
+      orderBy: { issued_at: 'asc' },
+    });
+  }
+
+  async syncRooms(limit?: number) {
     try {
       const bookings = await this.prismaService.roomBooking.findMany({
-        where: {
-          local_sync: 0,
-          isCancelled: false, 
-          isConfirmed: true
-        },
+        where: { local_sync: { not: 1 } },
+        take: this.normalizeSyncLimit(limit),
+        orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
         include: {
+          member: { select: { Membership_No: true, Name: true, Balance: true } },
           rooms: {
-            select: {id: true}
+            select: {
+              roomId: true,
+              priceAtBooking: true,
+              room: {
+                select: {
+                  id: true,
+                  roomNumber: true,
+                  roomTypeId: true,
+                  roomType: { select: { type: true } },
+                },
+              },
+            },
           },
+          cancellationRequests: true,
         },
       });
-
-      const bookingIds = bookings.map((b) => b.id);
-      const vouchers = await this.prismaService.paymentVoucher.findMany({
-        where: {
-          booking_id: { in: bookingIds },
-          booking_type: 'ROOM',
-        },
-        select: {
-          booking_id: true, id: true, consumer_number: true, booking_type: true, amount: true, payment_mode: true, invoice_no: true, transaction_id: true, card_number: true, check_number: true, bank_name: true, voucher_type: true, status: true, remarks: true, issued_by: true, issued_at: true, expiresAt: true, paid_at: true
-        }
-      });
-
-      const data = bookings.map((booking) => {
-        const bookingVouchers = vouchers.filter((v) => v.booking_id === booking.id);
-        return {
-          ...booking,
-          vouchers: bookingVouchers,
-        };
-      });
-
+      const vouchers = await this.getSyncVouchers(bookings.map((b) => b.id), BookingType.ROOM);
+      const groupedVouchers = this.groupSyncVouchers(vouchers);
       return {
         status: true,
-        data,
+        data: bookings.map((booking) =>
+          this.mapRoomSyncBooking(booking, groupedVouchers.get(booking.id) || []),
+        ),
       };
     } catch (error) {
       throw new InternalServerErrorException(error.message);
     }
   }
 
+  async syncAffiliatedRooms(limit?: number) {
+    try {
+      const bookings = await this.prismaService.affClubBooking.findMany({
+        where: { local_sync: { not: 1 } },
+        take: this.normalizeSyncLimit(limit),
+        orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
+        include: {
+          affiliatedClub: true,
+          rooms: {
+            select: {
+              roomId: true,
+              priceAtBooking: true,
+              room: {
+                select: {
+                  id: true,
+                  roomNumber: true,
+                  roomTypeId: true,
+                  roomType: { select: { type: true } },
+                },
+              },
+            },
+          },
+          cancellationRequests: true,
+        },
+      });
+      const vouchers = await this.getSyncVouchers(bookings.map((b) => b.id), BookingType.AFF_ROOM);
+      const groupedVouchers = this.groupSyncVouchers(vouchers);
+      return {
+        status: true,
+        data: bookings.map((booking) =>
+          this.mapAffiliatedRoomSyncBooking(booking, groupedVouchers.get(booking.id) || []),
+        ),
+      };
+    } catch (error: any) {
+      throw new InternalServerErrorException(error.message);
+    }
+  }
+
+  async syncHalls(limit?: number) {
+    try {
+      const bookings = await this.prismaService.hallBooking.findMany({
+        where: { local_sync: { not: 1 } },
+        take: this.normalizeSyncLimit(limit),
+        orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
+        include: {
+          member: { select: { Membership_No: true, Name: true, Balance: true } },
+          hall: true,
+          cancellationRequests: true,
+        },
+      });
+      const vouchers = await this.getSyncVouchers(bookings.map((b) => b.id), BookingType.HALL);
+      const groupedVouchers = this.groupSyncVouchers(vouchers);
+      return {
+        status: true,
+        data: bookings.map((booking) =>
+          this.mapHallSyncBooking(booking, groupedVouchers.get(booking.id) || []),
+        ),
+      };
+    } catch (error: any) {
+      throw new InternalServerErrorException(error.message);
+    }
+  }
+
+  async syncLawns(limit?: number) {
+    try {
+      const bookings = await this.prismaService.lawnBooking.findMany({
+        where: { local_sync: { not: 1 } },
+        take: this.normalizeSyncLimit(limit),
+        orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
+        include: {
+          member: { select: { Membership_No: true, Name: true, Balance: true } },
+          lawn: { include: { lawnCategory: true } },
+          cancellationRequests: true,
+        },
+      });
+      const vouchers = await this.getSyncVouchers(bookings.map((b) => b.id), BookingType.LAWN);
+      const groupedVouchers = this.groupSyncVouchers(vouchers);
+      return {
+        status: true,
+        data: bookings.map((booking) =>
+          this.mapLawnSyncBooking(booking, groupedVouchers.get(booking.id) || []),
+        ),
+      };
+    } catch (error) {
+      throw new InternalServerErrorException(error.message);
+    }
+  }
+
+  async syncPhotoshoots(limit?: number) {
+    try {
+      const bookings = await this.prismaService.photoshootBooking.findMany({
+        where: { local_sync: { not: 1 } },
+        take: this.normalizeSyncLimit(limit),
+        orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
+        include: {
+          member: { select: { Membership_No: true, Name: true, Balance: true } },
+          photoshoot: true,
+          cancellationRequests: true,
+        },
+      });
+      const vouchers = await this.getSyncVouchers(bookings.map((b) => b.id), BookingType.PHOTOSHOOT);
+      const groupedVouchers = this.groupSyncVouchers(vouchers);
+      return {
+        status: true,
+        data: bookings.map((booking) =>
+          this.mapPhotoshootSyncBooking(booking, groupedVouchers.get(booking.id) || []),
+        ),
+      };
+    } catch (error) {
+      throw new InternalServerErrorException(error.message);
+    }
+  }
+
+  async sync(limit?: number) {
+    return await this.syncRooms(limit);
+  }
+
+  private syncModelDelegate(bookingType?: string) {
+    switch ((bookingType || 'ROOM').toUpperCase()) {
+      case 'ROOM':
+      case 'GUEST_ROOM':
+      case 'GUEST_ROOMS':
+        return { type: 'ROOM', delegate: this.prismaService.roomBooking };
+      case 'AFF_ROOM':
+      case 'AFFILIATED_ROOM':
+      case 'AFFILIATED_ROOMS':
+        return { type: 'AFF_ROOM', delegate: this.prismaService.affClubBooking };
+      case 'HALL':
+      case 'HALLS':
+        return { type: 'HALL', delegate: this.prismaService.hallBooking };
+      case 'LAWN':
+      case 'LAWNS':
+        return { type: 'LAWN', delegate: this.prismaService.lawnBooking };
+      case 'PHOTOSHOOT':
+      case 'PHOTOSHOOTS':
+        return { type: 'PHOTOSHOOT', delegate: this.prismaService.photoshootBooking };
+      default:
+        return null;
+    }
+  }
+
   async syncResponse(payload: {
     results: {
+      booking_type?: string;
       booking_id: number;
       local_sync_id: string;
       local_sync_status: number;
       local_sync_message: string;
     }[];
   }) {
-    try {
-      const results = payload.results;
-      const updatedBookings: any[] = [];
+    const results = payload.results || [];
+    const updated: any[] = [];
+    const failed: any[] = [];
 
-      for (const result of results) {
+    for (const result of results) {
+      try {
+        const target = this.syncModelDelegate(result.booking_type);
+        if (!target) {
+          failed.push({
+            booking_type: result.booking_type || 'ROOM',
+            booking_id: result.booking_id,
+            error: 'Invalid booking_type',
+          });
+          continue;
+        }
+
         const updateData: any = {
-          local_sync_id: result.local_sync_id,
-          local_sync_status: result.local_sync_status,
-          local_sync_message: result.local_sync_message,
+          local_sync: Number(result.local_sync_status) === 1 ? 1 : 0,
+          local_sync_id: result.local_sync_id || null,
+          local_sync_status: Number(result.local_sync_status),
+          local_sync_message: result.local_sync_message || null,
           sync_datetime: new Date(),
         };
 
-        if (result.local_sync_status === 1) {
-          updateData.local_sync = 1;
-        }
-
-        const updated = await this.prismaService.roomBooking.update({
-          where: { id: result.booking_id },
+        const row = await (target.delegate as any).update({
+          where: { id: Number(result.booking_id) },
           data: updateData,
         });
 
-        updatedBookings.push({
-          booking_id: updated.id,
-          local_sync_id: updated.local_sync_id,
-          local_sync_status: updated.local_sync_status,
-          sync_datetime: updated.sync_datetime,
-          local_sync_message: updated.local_sync_message,
+        updated.push({
+          booking_type: target.type,
+          booking_id: row.id,
+          local_sync_id: row.local_sync_id,
+          local_sync_status: row.local_sync_status,
+          sync_datetime: row.sync_datetime,
+          local_sync_message: row.local_sync_message,
+        });
+      } catch (error) {
+        failed.push({
+          booking_type: result.booking_type || 'ROOM',
+          booking_id: result.booking_id,
+          error: error.message,
         });
       }
-
-      return {
-        status: true,
-        data: updatedBookings,
-      };
-    } catch (error) {
-      throw new InternalServerErrorException(error.message);
     }
+
+    return {
+      status: failed.length === 0,
+      updated,
+      failed,
+      data: updated,
+    };
   }
 }
 

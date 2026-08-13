@@ -210,6 +210,7 @@ model RoomBooking {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([local_sync])
   @@map("roombooking")
 }
 
@@ -253,6 +254,12 @@ model HallBooking {
   extraCharges   Json?   @default("[]") // Stores { head: string, amount: number }
   cancellationRequests HallCancellationRequest[]
 
+  local_sync         Int       @default(0)
+  local_sync_id       String?
+  local_sync_status   Int?
+  sync_datetime      DateTime?
+  local_sync_message String?   @db.Text
+
   member Member @relation(fields: [memberId], references: [Sno])
   hall   Hall   @relation(fields: [hallId], references: [id])
 
@@ -262,6 +269,7 @@ model HallBooking {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([local_sync])
   @@map("hallbooking")
 }
 
@@ -298,6 +306,12 @@ model LawnBooking {
   extraCharges   Json?   @default("[]") // Stores { head: string, amount: number }
   cancellationRequests LawnCancellationRequest[]
 
+  local_sync         Int       @default(0)
+  local_sync_id       String?
+  local_sync_status   Int?
+  sync_datetime      DateTime?
+  local_sync_message String?   @db.Text
+
   member Member @relation(fields: [memberId], references: [Sno])
   lawn   Lawn   @relation(fields: [lawnId], references: [id])
 
@@ -307,6 +321,7 @@ model LawnBooking {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([local_sync])
   @@map("lawnbooking")
 }
 
@@ -339,6 +354,12 @@ model PhotoshootBooking {
   isCancelled    Boolean @default(false)
   cancellationRequests PhotoshootCancellationRequest[]
 
+  local_sync         Int       @default(0)
+  local_sync_id       String?
+  local_sync_status   Int?
+  sync_datetime      DateTime?
+  local_sync_message String?   @db.Text
+
 
   member     Member     @relation(fields: [memberId], references: [Sno])
   photoshoot Photoshoot @relation(fields: [photoshootId], references: [id])
@@ -349,6 +370,7 @@ model PhotoshootBooking {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([local_sync])
   @@map("photoshootbooking")
 }
 
@@ -1318,7 +1340,14 @@ model AffClubBooking {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  local_sync         Int       @default(0)
+  local_sync_id       String?
+  local_sync_status   Int?
+  sync_datetime      DateTime?
+  local_sync_message String?   @db.Text
+
   @@index([affiliatedClubId])
+  @@index([local_sync])
 
   @@map("affclubbooking")
 }
