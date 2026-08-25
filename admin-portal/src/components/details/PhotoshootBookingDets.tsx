@@ -461,6 +461,18 @@ export function PhotoshootBookingDetailsCard({
                   </div>
                 )}
 
+                {booking.remarks && (
+                  <div className="space-y-2">
+                    <h3 className="font-semibold text-sm flex items-center gap-2 text-gray-700">
+                      <FileText className="h-4 w-4" />
+                      Remarks
+                    </h3>
+                    <div className="p-3 bg-amber-50/60 border border-amber-200 rounded-md text-sm text-gray-800 whitespace-pre-wrap">
+                      {booking.remarks}
+                    </div>
+                  </div>
+                )}
+
                 {/* Audit Information */}
                 {showFullDetails && (
                   <div className="space-y-2">

@@ -65,6 +65,7 @@ export interface PhotoshootBooking {
   guestCNIC?: string;
   groomName?: string;
   brideName?: string;
+  remarks?: string;
   createdAt?: string;
   updatedAt?: string;
   createdBy?: string;
@@ -364,6 +365,7 @@ export default function PhotoshootBookings() {
   const [pBankName, setPBankName] = useState("");
   const [pTransactionId, setPTransactionId] = useState("");
   const [pPaidAt, setPPaidAt] = useState("");
+  const [remarks, setRemarks] = useState("");
 
 
   const [detailBooking, setDetailBooking] = useState<PhotoshootBooking | null>(null);
@@ -448,6 +450,7 @@ export default function PhotoshootBookings() {
       const { reservationId, resourceId, startTime, endTime, timeSlot, remarks } = state;
 
       setSelectedPhotoshootId(resourceId?.toString() || "");
+      setRemarks(remarks || "");
       setBookingDetails([{
         date: format(new Date(startTime), "yyyy-MM-dd"),
         timeSlot: timeSlot || format(new Date(startTime), "yyyy-MM-dd'T'10:00:00"), // Use timeSlot if available
@@ -665,6 +668,7 @@ export default function PhotoshootBookings() {
     setPBankName("");
     setPTransactionId("");
     setPPaidAt("");
+    setRemarks("");
   };
 
   const handleCloseAddModal = () => {
@@ -752,6 +756,7 @@ export default function PhotoshootBookings() {
       guestCNIC: guestSec.guestCNIC,
       groomName: guestSec.groomName,
       brideName: guestSec.brideName,
+      remarks,
     };
   };
 
@@ -808,6 +813,7 @@ export default function PhotoshootBookings() {
       guestCNIC: guestSec.guestCNIC,
       groomName: guestSec.groomName,
       brideName: guestSec.brideName,
+      remarks,
       reservationId: firstSlot.reservationId
     };
 
@@ -837,11 +843,13 @@ export default function PhotoshootBookings() {
 
   const openEditDialog = (booking: PhotoshootBooking) => {
     setEditBooking(booking);
+    setRemarks(booking.remarks || "");
     setIsEditDialogOpen(true);
   };
 
   const openEditPaymentDialog = (booking: PhotoshootBooking) => {
     setEditBooking(booking);
+    setRemarks(booking.remarks || "");
     setEditPaymentDialogOpen(true);
   };
 
@@ -882,6 +890,7 @@ export default function PhotoshootBookings() {
       setPBankName((editBooking as any).bank_name || "");
       setPTransactionId((editBooking as any).transaction_id || "");
       setPPaidAt((editBooking as any).paid_at || "");
+      setRemarks(editBooking.remarks || "");
     }
   }, [editBooking]);
 
@@ -1205,6 +1214,17 @@ export default function PhotoshootBookings() {
 
                   </div>
                 </div>}
+
+                <div className="col-span-full">
+                  <Label>Remarks (Optional)</Label>
+                  <Input
+                    type="text"
+                    className="mt-1"
+                    placeholder="Enter optional remarks"
+                    value={remarks}
+                    onChange={(e) => setRemarks(e.target.value)}
+                  />
+                </div>
 
                 {/* Accounting Summary Section */}
                 {/* <div className="md:col-span-2">
@@ -1697,9 +1717,6 @@ export default function PhotoshootBookings() {
             </div>
 
             {pricingType == "guest" && <div className="p-4 rounded-xl border bg-white shadow-sm col-span-full">
-
-              <h3 className="text-lg font-semibold mb-4">Guest Information</h3>
-
               <div className="flex  flex-col">
 
                 <div className="flex items-center justify-center gap-x-5">
@@ -1769,6 +1786,17 @@ export default function PhotoshootBookings() {
 
               </div>
             </div>}
+
+            <div className="col-span-full">
+              <Label>Remarks (Optional)</Label>
+              <Input
+                type="text"
+                className="mt-1"
+                placeholder="Enter optional remarks"
+                value={remarks}
+                onChange={(e) => setRemarks(e.target.value)}
+              />
+            </div>
 
             {/* Payment Summary */}
             <BookingPaymentSummaryCard

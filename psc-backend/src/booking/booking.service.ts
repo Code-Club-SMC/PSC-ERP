@@ -5417,6 +5417,7 @@ export class BookingService {
       card_number,
       check_number,
       bank_name,
+      remarks,
     } = payload;
 
     // 1. Validate Member
@@ -5522,6 +5523,7 @@ export class BookingService {
         guestContact,
         groomName,
         brideName,
+        remarks: remarks || null,
         bookingDetails: payload.bookingDetails || [],
         createdBy,
         updatedBy: '-',

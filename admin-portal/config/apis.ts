@@ -2840,6 +2840,6 @@ export const deleteActivityNotifications = async (ids: number[]) => {
   const response = await axios.delete(`${base_url}/activity-notifications`, {
     data: { ids },
     withCredentials: true,
-  });
+  } as any);
   return response.data;
 };
